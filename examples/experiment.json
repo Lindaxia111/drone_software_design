@@ -1,0 +1,90 @@
+{
+  "goal": {
+    "name": "续航与稳定性探索",
+    "search_space": [
+      {
+        "param_path": "power.capacity_wh",
+        "type": "continuous",
+        "bounds": [
+          35.0,
+          130.0
+        ]
+      },
+      {
+        "param_path": "rotors[*].max_thrust_n",
+        "type": "continuous",
+        "bounds": [
+          3.0,
+          12.0
+        ]
+      }
+    ],
+    "constraints": [
+      {
+        "metric": "total_mass_kg",
+        "operator": "<=",
+        "limit": 1.5
+      },
+      {
+        "metric": "thrust_to_weight_ratio",
+        "operator": ">=",
+        "limit": 2.0
+      }
+    ],
+    "objectives": [
+      {
+        "metric": "flight_time_min",
+        "direction": "maximize",
+        "weight": 1.0
+      },
+      {
+        "metric": "tracking_rmse_m",
+        "direction": "minimize",
+        "weight": 1.0
+      }
+    ],
+    "budget": {
+      "max_generations": 10,
+      "batch_size": 8,
+      "max_l1_evals": 100,
+      "max_l2_evals": 80,
+      "max_l3_evals": 0,
+      "timeout_sec": 300
+    }
+  },
+  "scenario": {
+    "scenario_id": "hover-demo",
+    "version": "1.0.0",
+    "duration_s": 30.0,
+    "sim_dt_s": 0.02,
+    "air_density_kg_m3": 1.225,
+    "wind_velocity_m_s": [
+      1.0,
+      0.0,
+      0.0
+    ],
+    "wind_type": "constant",
+    "mission": {
+      "type": "hover",
+      "altitude_m": 5.0,
+      "step_m": [
+        1.0,
+        0.0,
+        0.0
+      ],
+      "step_time_s": 1.0,
+      "waypoints": []
+    },
+    "fault_injections": [],
+    "domain_randomization": {
+      "enabled": false,
+      "trials": 2,
+      "mass_variance_pct": 10.0
+    }
+  },
+  "seed": 42,
+  "seed_ir": null,
+  "evaluation_mode": "demo",
+  "optimizer": "random",
+  "start_paused": false
+}

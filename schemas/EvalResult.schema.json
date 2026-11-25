@@ -1,0 +1,186 @@
+{
+  "$defs": {
+    "ReplayData": {
+      "additionalProperties": false,
+      "properties": {
+        "coordinate_frame": {
+          "const": "NED",
+          "default": "NED",
+          "title": "Coordinate Frame",
+          "type": "string"
+        },
+        "quaternion_order": {
+          "const": "wxyz",
+          "default": "wxyz",
+          "title": "Quaternion Order",
+          "type": "string"
+        },
+        "frames": {
+          "items": {
+            "maxItems": 8,
+            "minItems": 8,
+            "prefixItems": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "number"
+              }
+            ],
+            "type": "array"
+          },
+          "title": "Frames",
+          "type": "array"
+        }
+      },
+      "required": [
+        "coordinate_frame",
+        "quaternion_order",
+        "frames"
+      ],
+      "title": "ReplayData",
+      "type": "object"
+    },
+    "Violation": {
+      "additionalProperties": false,
+      "properties": {
+        "rule": {
+          "title": "Rule",
+          "type": "string"
+        },
+        "actual": {
+          "title": "Actual",
+          "type": "number"
+        },
+        "limit": {
+          "title": "Limit",
+          "type": "number"
+        },
+        "message": {
+          "default": "",
+          "title": "Message",
+          "type": "string"
+        }
+      },
+      "required": [
+        "rule",
+        "actual",
+        "limit",
+        "message"
+      ],
+      "title": "Violation",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "evaluator_level": {
+      "enum": [
+        "L1",
+        "L2",
+        "L3"
+      ],
+      "title": "Evaluator Level",
+      "type": "string"
+    },
+    "evaluator_version": {
+      "title": "Evaluator Version",
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "PASSED",
+        "REJECTED_CONSTRAINT",
+        "CRASHED",
+        "TIMEOUT",
+        "UNSUPPORTED"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "metrics": {
+      "additionalProperties": {
+        "type": "number"
+      },
+      "title": "Metrics",
+      "type": "object"
+    },
+    "violations": {
+      "items": {
+        "$ref": "#/$defs/Violation"
+      },
+      "title": "Violations",
+      "type": "array"
+    },
+    "execution_time_ms": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Execution Time Ms",
+      "type": "number"
+    },
+    "fidelity": {
+      "enum": [
+        "ANALYTIC",
+        "DEMO",
+        "DYNAMICS"
+      ],
+      "title": "Fidelity",
+      "type": "string"
+    },
+    "message": {
+      "default": "",
+      "title": "Message",
+      "type": "string"
+    },
+    "replay": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ReplayData"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "resolved_parameters": {
+      "additionalProperties": {
+        "type": "number"
+      },
+      "title": "Resolved Parameters",
+      "type": "object"
+    }
+  },
+  "required": [
+    "evaluator_level",
+    "evaluator_version",
+    "status",
+    "metrics",
+    "violations",
+    "execution_time_ms",
+    "fidelity",
+    "message",
+    "replay",
+    "resolved_parameters"
+  ],
+  "title": "EvalResult",
+  "type": "object"
+}

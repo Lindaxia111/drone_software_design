@@ -1,0 +1,114 @@
+{
+  "schema_version": "1.0.0",
+  "airframe": {
+    "topology": "multirotor",
+    "base_mass_kg": 0.55,
+    "inertia_diag_kg_m2": [
+      0.02,
+      0.02,
+      0.04
+    ],
+    "cg_offset_m": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "linear_drag_coeff": [
+      0.1,
+      0.1,
+      0.15
+    ]
+  },
+  "rotors": [
+    {
+      "id": "r1",
+      "position_m": [
+        0.18,
+        0.18,
+        0.0
+      ],
+      "thrust_axis": [
+        0.0,
+        0.0,
+        -1.0
+      ],
+      "spin_direction": 1,
+      "max_thrust_n": 8.0,
+      "torque_to_thrust_ratio": 0.02,
+      "motor_time_constant_s": 0.03,
+      "prop_radius_m": 0.1
+    },
+    {
+      "id": "r2",
+      "position_m": [
+        -0.18,
+        0.18,
+        0.0
+      ],
+      "thrust_axis": [
+        0.0,
+        0.0,
+        -1.0
+      ],
+      "spin_direction": -1,
+      "max_thrust_n": 8.0,
+      "torque_to_thrust_ratio": 0.02,
+      "motor_time_constant_s": 0.03,
+      "prop_radius_m": 0.1
+    },
+    {
+      "id": "r3",
+      "position_m": [
+        -0.18,
+        -0.18,
+        0.0
+      ],
+      "thrust_axis": [
+        0.0,
+        0.0,
+        -1.0
+      ],
+      "spin_direction": 1,
+      "max_thrust_n": 8.0,
+      "torque_to_thrust_ratio": 0.02,
+      "motor_time_constant_s": 0.03,
+      "prop_radius_m": 0.1
+    },
+    {
+      "id": "r4",
+      "position_m": [
+        0.18,
+        -0.18,
+        0.0
+      ],
+      "thrust_axis": [
+        0.0,
+        0.0,
+        -1.0
+      ],
+      "spin_direction": -1,
+      "max_thrust_n": 8.0,
+      "torque_to_thrust_ratio": 0.02,
+      "motor_time_constant_s": 0.03,
+      "prop_radius_m": 0.1
+    }
+  ],
+  "power": {
+    "battery_mass_kg": 0.4,
+    "capacity_wh": 72.0,
+    "max_discharge_w": 800.0
+  },
+  "payload": {
+    "mass_kg": 0.2,
+    "position_m": [
+      0.0,
+      0.0,
+      0.0
+    ]
+  },
+  "controller": {
+    "type": "cascaded_pid",
+    "auto_scale_gains": true,
+    "params": {}
+  }
+}

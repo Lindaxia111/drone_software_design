@@ -1,0 +1,30 @@
+{
+  "scenario_id": "hover-demo",
+  "version": "1.0.0",
+  "duration_s": 30.0,
+  "sim_dt_s": 0.02,
+  "air_density_kg_m3": 1.225,
+  "wind_velocity_m_s": [
+    1.0,
+    0.0,
+    0.0
+  ],
+  "wind_type": "constant",
+  "mission": {
+    "type": "hover",
+    "altitude_m": 5.0,
+    "step_m": [
+      1.0,
+      0.0,
+      0.0
+    ],
+    "step_time_s": 1.0,
+    "waypoints": []
+  },
+  "fault_injections": [],
+  "domain_randomization": {
+    "enabled": false,
+    "trials": 2,
+    "mass_variance_pct": 10.0
+  }
+}

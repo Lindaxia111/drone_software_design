@@ -1,0 +1,263 @@
+{
+  "$defs": {
+    "DomainRandomization": {
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "default": false,
+          "title": "Enabled",
+          "type": "boolean"
+        },
+        "trials": {
+          "default": 2,
+          "maximum": 20,
+          "minimum": 1,
+          "title": "Trials",
+          "type": "integer"
+        },
+        "mass_variance_pct": {
+          "default": 10,
+          "maximum": 50,
+          "minimum": 0,
+          "title": "Mass Variance Pct",
+          "type": "number"
+        }
+      },
+      "required": [
+        "enabled",
+        "trials",
+        "mass_variance_pct"
+      ],
+      "title": "DomainRandomization",
+      "type": "object"
+    },
+    "FaultInjection": {
+      "additionalProperties": false,
+      "properties": {
+        "trigger_time_s": {
+          "minimum": 0,
+          "title": "Trigger Time S",
+          "type": "number"
+        },
+        "target_rotor_id": {
+          "title": "Target Rotor Id",
+          "type": "string"
+        },
+        "fault_type": {
+          "enum": [
+            "motor_out",
+            "thrust_loss"
+          ],
+          "title": "Fault Type",
+          "type": "string"
+        },
+        "severity": {
+          "exclusiveMinimum": 0,
+          "maximum": 1,
+          "title": "Severity",
+          "type": "number"
+        }
+      },
+      "required": [
+        "trigger_time_s",
+        "target_rotor_id",
+        "fault_type",
+        "severity"
+      ],
+      "title": "FaultInjection",
+      "type": "object"
+    },
+    "Mission": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "default": "hover",
+          "enum": [
+            "hover",
+            "step_response",
+            "waypoints"
+          ],
+          "title": "Type",
+          "type": "string"
+        },
+        "altitude_m": {
+          "default": 5,
+          "exclusiveMinimum": 0,
+          "title": "Altitude M",
+          "type": "number"
+        },
+        "step_m": {
+          "default": [
+            1,
+            0,
+            0
+          ],
+          "maxItems": 3,
+          "minItems": 3,
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ],
+          "title": "Step M",
+          "type": "array"
+        },
+        "step_time_s": {
+          "default": 1,
+          "minimum": 0,
+          "title": "Step Time S",
+          "type": "number"
+        },
+        "waypoints": {
+          "items": {
+            "$ref": "#/$defs/Waypoint"
+          },
+          "maxItems": 100,
+          "title": "Waypoints",
+          "type": "array"
+        }
+      },
+      "required": [
+        "type",
+        "altitude_m",
+        "step_m",
+        "step_time_s",
+        "waypoints"
+      ],
+      "title": "Mission",
+      "type": "object"
+    },
+    "Waypoint": {
+      "additionalProperties": false,
+      "properties": {
+        "t_s": {
+          "minimum": 0,
+          "title": "T S",
+          "type": "number"
+        },
+        "position_m": {
+          "maxItems": 3,
+          "minItems": 3,
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ],
+          "title": "Position M",
+          "type": "array"
+        }
+      },
+      "required": [
+        "t_s",
+        "position_m"
+      ],
+      "title": "Waypoint",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "scenario_id": {
+      "default": "hover-demo",
+      "maxLength": 100,
+      "minLength": 1,
+      "title": "Scenario Id",
+      "type": "string"
+    },
+    "version": {
+      "default": "1.0.0",
+      "title": "Version",
+      "type": "string"
+    },
+    "duration_s": {
+      "default": 30,
+      "exclusiveMinimum": 0,
+      "title": "Duration S",
+      "type": "number"
+    },
+    "sim_dt_s": {
+      "default": 0.02,
+      "exclusiveMinimum": 0,
+      "title": "Sim Dt S",
+      "type": "number"
+    },
+    "air_density_kg_m3": {
+      "default": 1.225,
+      "exclusiveMinimum": 0,
+      "title": "Air Density Kg M3",
+      "type": "number"
+    },
+    "wind_velocity_m_s": {
+      "default": [
+        1,
+        0,
+        0
+      ],
+      "maxItems": 3,
+      "minItems": 3,
+      "prefixItems": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "number"
+        },
+        {
+          "type": "number"
+        }
+      ],
+      "title": "Wind Velocity M S",
+      "type": "array"
+    },
+    "wind_type": {
+      "default": "constant",
+      "enum": [
+        "none",
+        "constant",
+        "gust"
+      ],
+      "title": "Wind Type",
+      "type": "string"
+    },
+    "mission": {
+      "$ref": "#/$defs/Mission"
+    },
+    "fault_injections": {
+      "items": {
+        "$ref": "#/$defs/FaultInjection"
+      },
+      "maxItems": 20,
+      "title": "Fault Injections",
+      "type": "array"
+    },
+    "domain_randomization": {
+      "$ref": "#/$defs/DomainRandomization"
+    }
+  },
+  "required": [
+    "scenario_id",
+    "version",
+    "duration_s",
+    "sim_dt_s",
+    "air_density_kg_m3",
+    "wind_velocity_m_s",
+    "wind_type",
+    "mission",
+    "fault_injections",
+    "domain_randomization"
+  ],
+  "title": "TestScenario",
+  "type": "object"
+}

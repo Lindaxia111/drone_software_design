@@ -1,0 +1,14 @@
+[project]
+name = "dronedesign"
+version = "0.1.0"
+description = "软件定义无人机自动设计与仿真验证平台（核心引擎）"
+requires-python = ">=3.11"
+dependencies = ["pydantic>=2.5", "numpy", "scipy"]
+
+[project.optional-dependencies]
+dev = ["pytest"]
+# 阶段二/三：optuna, pymoo, fastapi, uvicorn, celery/arq, redis, docker SDK, mavsdk
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]

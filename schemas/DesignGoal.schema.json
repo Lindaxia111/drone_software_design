@@ -1,0 +1,230 @@
+{
+  "$defs": {
+    "Budget": {
+      "additionalProperties": false,
+      "properties": {
+        "max_generations": {
+          "default": 10,
+          "maximum": 10000,
+          "minimum": 1,
+          "title": "Max Generations",
+          "type": "integer"
+        },
+        "batch_size": {
+          "default": 8,
+          "maximum": 100,
+          "minimum": 1,
+          "title": "Batch Size",
+          "type": "integer"
+        },
+        "max_l1_evals": {
+          "default": 100,
+          "maximum": 100000,
+          "minimum": 1,
+          "title": "Max L1 Evals",
+          "type": "integer"
+        },
+        "max_l2_evals": {
+          "default": 80,
+          "maximum": 100000,
+          "minimum": 0,
+          "title": "Max L2 Evals",
+          "type": "integer"
+        },
+        "max_l3_evals": {
+          "const": 0,
+          "default": 0,
+          "title": "Max L3 Evals",
+          "type": "integer"
+        },
+        "timeout_sec": {
+          "default": 300,
+          "maximum": 86400,
+          "minimum": 1,
+          "title": "Timeout Sec",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "max_generations",
+        "batch_size",
+        "max_l1_evals",
+        "max_l2_evals",
+        "max_l3_evals",
+        "timeout_sec"
+      ],
+      "title": "Budget",
+      "type": "object"
+    },
+    "Constraint": {
+      "additionalProperties": false,
+      "properties": {
+        "metric": {
+          "enum": [
+            "total_mass_kg",
+            "thrust_to_weight_ratio",
+            "flight_time_min",
+            "tracking_rmse_m",
+            "hover_power_w",
+            "max_tilt_deg",
+            "crash_rate",
+            "saturation_frac",
+            "flight_time_min_sim",
+            "max_pos_err_m",
+            "final_pos_err_m"
+          ],
+          "title": "Metric",
+          "type": "string"
+        },
+        "operator": {
+          "enum": [
+            "<=",
+            ">=",
+            "=="
+          ],
+          "title": "Operator",
+          "type": "string"
+        },
+        "limit": {
+          "title": "Limit",
+          "type": "number"
+        }
+      },
+      "required": [
+        "metric",
+        "operator",
+        "limit"
+      ],
+      "title": "Constraint",
+      "type": "object"
+    },
+    "Objective": {
+      "additionalProperties": false,
+      "properties": {
+        "metric": {
+          "enum": [
+            "total_mass_kg",
+            "thrust_to_weight_ratio",
+            "flight_time_min",
+            "tracking_rmse_m",
+            "hover_power_w",
+            "max_tilt_deg",
+            "crash_rate",
+            "saturation_frac",
+            "flight_time_min_sim",
+            "max_pos_err_m",
+            "final_pos_err_m"
+          ],
+          "title": "Metric",
+          "type": "string"
+        },
+        "direction": {
+          "enum": [
+            "maximize",
+            "minimize"
+          ],
+          "title": "Direction",
+          "type": "string"
+        },
+        "weight": {
+          "default": 1,
+          "exclusiveMinimum": 0,
+          "title": "Weight",
+          "type": "number"
+        }
+      },
+      "required": [
+        "metric",
+        "direction",
+        "weight"
+      ],
+      "title": "Objective",
+      "type": "object"
+    },
+    "SearchParameter": {
+      "additionalProperties": false,
+      "properties": {
+        "param_path": {
+          "title": "Param Path",
+          "type": "string"
+        },
+        "type": {
+          "const": "continuous",
+          "default": "continuous",
+          "title": "Type",
+          "type": "string"
+        },
+        "bounds": {
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "number"
+            },
+            {
+              "exclusiveMinimum": 0,
+              "type": "number"
+            }
+          ],
+          "title": "Bounds",
+          "type": "array"
+        }
+      },
+      "required": [
+        "param_path",
+        "type",
+        "bounds"
+      ],
+      "title": "SearchParameter",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "name": {
+      "default": "续航与稳定性探索",
+      "maxLength": 100,
+      "minLength": 1,
+      "title": "Name",
+      "type": "string"
+    },
+    "search_space": {
+      "items": {
+        "$ref": "#/$defs/SearchParameter"
+      },
+      "maxItems": 6,
+      "title": "Search Space",
+      "type": "array"
+    },
+    "constraints": {
+      "items": {
+        "$ref": "#/$defs/Constraint"
+      },
+      "maxItems": 20,
+      "title": "Constraints",
+      "type": "array"
+    },
+    "objectives": {
+      "items": {
+        "$ref": "#/$defs/Objective"
+      },
+      "maxItems": 5,
+      "minItems": 1,
+      "title": "Objectives",
+      "type": "array"
+    },
+    "budget": {
+      "$ref": "#/$defs/Budget"
+    }
+  },
+  "required": [
+    "name",
+    "search_space",
+    "constraints",
+    "objectives",
+    "budget"
+  ],
+  "title": "DesignGoal",
+  "type": "object"
+}

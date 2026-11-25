@@ -1,0 +1,13 @@
+.venv/
+.runtime/
+node_modules/
+apps/web/dist/
+data/
+tmp/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.coverage
+.env
+*.tsbuildinfo

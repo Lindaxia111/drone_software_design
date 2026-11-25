@@ -1,0 +1,146 @@
+{
+  "$defs": {
+    "Budget": {
+      "additionalProperties": false,
+      "properties": {
+        "max_generations": {
+          "default": 10,
+          "maximum": 10000,
+          "minimum": 1,
+          "title": "Max Generations",
+          "type": "integer"
+        },
+        "batch_size": {
+          "default": 8,
+          "maximum": 100,
+          "minimum": 1,
+          "title": "Batch Size",
+          "type": "integer"
+        },
+        "max_l1_evals": {
+          "default": 100,
+          "maximum": 100000,
+          "minimum": 1,
+          "title": "Max L1 Evals",
+          "type": "integer"
+        },
+        "max_l2_evals": {
+          "default": 80,
+          "maximum": 100000,
+          "minimum": 0,
+          "title": "Max L2 Evals",
+          "type": "integer"
+        },
+        "max_l3_evals": {
+          "const": 0,
+          "default": 0,
+          "title": "Max L3 Evals",
+          "type": "integer"
+        },
+        "timeout_sec": {
+          "default": 300,
+          "maximum": 86400,
+          "minimum": 1,
+          "title": "Timeout Sec",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "max_generations",
+        "batch_size",
+        "max_l1_evals",
+        "max_l2_evals",
+        "max_l3_evals",
+        "timeout_sec"
+      ],
+      "title": "Budget",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "title": "Id",
+      "type": "string"
+    },
+    "name": {
+      "title": "Name",
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "QUEUED",
+        "RUNNING",
+        "PAUSED",
+        "CANCELLED",
+        "COMPLETED"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "created_at": {
+      "title": "Created At",
+      "type": "number"
+    },
+    "updated_at": {
+      "title": "Updated At",
+      "type": "number"
+    },
+    "elapsed_sec": {
+      "minimum": 0,
+      "title": "Elapsed Sec",
+      "type": "number"
+    },
+    "seed": {
+      "title": "Seed",
+      "type": "integer"
+    },
+    "next_index": {
+      "title": "Next Index",
+      "type": "integer"
+    },
+    "l1_used": {
+      "title": "L1 Used",
+      "type": "integer"
+    },
+    "l2_used": {
+      "title": "L2 Used",
+      "type": "integer"
+    },
+    "cache_hits": {
+      "title": "Cache Hits",
+      "type": "integer"
+    },
+    "stop_reason": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Stop Reason"
+    },
+    "budget": {
+      "$ref": "#/$defs/Budget"
+    }
+  },
+  "required": [
+    "id",
+    "name",
+    "status",
+    "created_at",
+    "updated_at",
+    "elapsed_sec",
+    "seed",
+    "next_index",
+    "l1_used",
+    "l2_used",
+    "cache_hits",
+    "stop_reason",
+    "budget"
+  ],
+  "title": "RunSummary",
+  "type": "object"
+}
