@@ -11,3 +11,7 @@ __pycache__/
 .coverage
 .env
 *.tsbuildinfo
+
+# Keep local reference documents and archives out of Git.
+*.[pP][dD][fF]
+*.[zZ][iI][pP]

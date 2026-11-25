@@ -1,94 +1,43 @@
-# 翼构 · 软件定义无人机设计实验室
+# 翼构 · 无人机设计实验室
 
-当前版本 v0.2：定义目标 → 随机/进化搜索 → L1 配平筛选 → L2 6-DOF 动力学 → 帕累托比较 → 参数、执行记录和轨迹查看 → 导出报告。
+面向多旋翼构型的本地设计与仿真实验平台：配置目标和约束，生成候选，通过分层评估比较方案，并查看参数、执行记录和轨迹。
 
-默认新建实验使用 **DYNAMICS** 模式，已结合 `1/dronedesign_platform` 接入探索级刚体动力学和级联 PID。仍可选择快速演示，历史演示记录保留 **DEMO** 标记；L3 尚未实现。模型用于方案相对比较，不能作为真机性能预测。
+当前版本为 **v0.2.0**。工作台默认使用 6-DOF 动力学和进化搜索，也支持随机搜索与快速演示。模型用于探索期相对比较，L3 高保真仿真尚未接入。
 
-## 当前工作区直接启动
+## 启动
+
+当前工作区已准备运行环境，在项目根目录执行：
 
 ```powershell
 ./scripts/dev.ps1
 ```
 
-访问 **http://127.0.0.1:8000**，点击“新建实验”。脚本构建前端，启动独立 Worker 与 API；Ctrl+C 停止后，实验状态仍保留。已有构建可用 `./scripts/dev.ps1 -SkipBuild`。
+打开 <http://127.0.0.1:8000>。全新环境请先按 [安装与启动](docs/guides/quickstart.md) 准备 Python 3.12+ 和 Node.js 20+。
 
-升级后需要重启 API 与 Worker，并刷新页面。工作区内 NumPy/SciPy 已准备好；其他旧环境先执行 `python -m pip install -r requirements.lock`。
+## 文档入口
 
-## 实验操作与参数查看
+完整导航见 [项目文档](docs/README.md)。
 
-- “创建后暂不启动”保存配置并保持暂停，检查参数后点击“启动”。也可直接“创建并运行”。
-- 顶部始终保留启动/继续、暂停、取消及复测入口。暂停只在 QUEUED/RUNNING 可用；完成后显示原因，点击“重新测试”按原快照创建新实验。
-- “实验参数”显示搜索范围、约束、目标、预算、种子、场景、风场和故障配置。
-- 每个候选的“查看参数”显示全部机体、旋翼、电池、载荷和控制参数，以及运行时合成惯量/实际增益、L1/L2 指标、约束原因、缓存和尝试记录。
-- 动力学候选的“轨迹”页可按时间检查位置和四元数；“原始 JSON”保留完整精度。
-- 创建表单支持模式、算法、场景、步长、风场、随机化和单旋翼故障；高级 JSON 可指定种子构型、航点和额外搜索参数。
+| 要做的事情 | 对应文档 |
+|---|---|
+| 安装、启动或排查启动问题 | [安装与启动](docs/guides/quickstart.md) |
+| 配置实验、暂停、查看候选参数与导出 | [实验操作指南](docs/guides/experiments.md) |
+| 理解模块、数据、仿真与恢复机制 | [工程架构](docs/architecture/overview.md) |
+| 开发、运行测试、生成契约 | [开发指南](docs/development/guide.md) |
+| 查看已完成能力和后续工作 | [开发路线](docs/development/roadmap.md) |
+| 核对验证结果与覆盖范围 | [验证记录](docs/quality/validation.md) |
+| 了解版本变化 | [变更记录](docs/releases/changelog.md) |
 
-工作区已准备 `.runtime/python/python.exe` 及依赖，此目录不纳入源码。机器原有 MSYS Python 不适用于这些 Windows 二进制依赖。
-
-## 新环境安装（Windows PowerShell）
-
-需要标准 CPython 3.12+、Node.js 20+（当前锁定的 NumPy/SciPy 要求 Python 3.12）：
-
-```powershell
-python -m venv .venv
-./.venv/Scripts/python.exe -m pip install -r requirements.lock
-./.venv/Scripts/python.exe -m pip install --no-deps -e '.[dev]'
-Push-Location apps/web
-npm ci
-Pop-Location
-./.venv/Scripts/python.exe scripts/generate_contracts.py
-./scripts/dev.ps1
-```
-
-## 开发与验证
-
-```powershell
-# 后端测试与契约生成（新环境可换用 .venv/Scripts/python.exe）
-./.runtime/python/python.exe -m pytest -q
-./.runtime/python/python.exe scripts/generate_contracts.py
-
-# API 与 Worker 分别启动
-./.runtime/python/python.exe -m uvicorn drone_lab.api:app --host 127.0.0.1 --port 8000
-./.runtime/python/python.exe -m drone_lab.worker
-
-# 前端热更新，访问 Vite 打印的地址；生产构建用 npm run build
-Set-Location apps/web
-npm run dev
-```
-
-API 文档：http://127.0.0.1:8000/docs 。生产构建由 API 同源托管，开发期由 Vite 代理 `/api`。浏览器验收见 `tests/browser-core.cjs`；原演示流程见 `tests/browser-smoke.cjs`。
-
-## 工程结构
+## 目录职责
 
 ```text
-apps/backend/drone_lab/
-  domain.py          核心实体、校验和插件契约
-  optimizers.py      按种子和提案序号生成候选
-  evaluators.py      L1、演示 L2、缓存键、约束和帕累托
-  core_adapter.py    参考核心契约适配、真实 L1/L2、轨迹与运行参数
-  orchestration.py   预算预占、漏斗调度与中断恢复
-  storage.py         SQLite 事务、实验及执行记录
-  worker.py          独立编排/计算进程与排他锁
-  api.py             创建、查询、控制、导出与工作台托管
-apps/backend/dronedesign/  从参考工程整合的物理、进化与仿真核心
-apps/web/            React + TypeScript 工作台
-schemas/             生成的 JSON Schema
-examples/            基准构型、实验与场景
-scripts/             契约生成和启动脚本
-tests/               流程、物理基准与 API 验证
-docs/                架构约定、阶段计划与验收记录
-data/                本地数据库（自动创建，已忽略）
+apps/          后端应用、仿真核心与前端工作台
+docs/          使用、架构、开发、质量与版本文档
+examples/      实验、构型和场景 JSON 示例
+schemas/       自动生成的 JSON Schema
+scripts/       启动与契约生成脚本
+tests/         应用回归、核心物理与浏览器验收
+data/          本地实验数据库，运行时生成
 ```
 
-## 行为约定
-
-- 动力学支持竖直推力的 4–8 旋翼；L1 可处理重心偏移和倾斜推力配平，L2 现有控制器暂不接受倾斜推力构型。机身惯量为显式输入，电池与载荷按质点合成惯量。
-- 支持容量、单桨推力、机身质量、臂长、桨半径、电机时间常数六个连续参数。改变容量时按固定 180 Wh/kg 同步电池质量。
-- 进化策略为 (μ+λ)，不是 NSGA-II；多目标前沿另按支配关系计算。优化器可从持久化候选与结果重放恢复。
-- 暂停阻止新任务派发，已派发任务允许完成归档；恢复保留候选序号。取消后不可恢复。
-- Worker 异常退出后，重启即可继续 RUNNING/QUEUED 实验；中断尝试保留并按剩余预算重试。
-- 预算按实际派发计数，缓存命中不消耗计算次数。超时按 RUNNING 墙钟时间累计，暂停不计时，进程离线期间仍计时。
-- 每个 SQLite 数据库只允许一个 Worker。首版以本地事务日志代替 Redis/Celery，尚未接入 PostgreSQL 与对象存储。
-- 默认仅监听本机，首版没有账号系统与多租户权限。
-
-整合范围与修复见 [核心整合说明](docs/core-integration.md)，后续工作见 [阶段计划](docs/development-plan.md)。
+当前采用独立 API/Worker 与 SQLite，本地每个数据库运行一个 Worker。完整能力边界见 [工程架构](docs/architecture/overview.md#能力边界)。
