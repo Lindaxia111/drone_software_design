@@ -64,6 +64,8 @@
       0.0
     ],
     "wind_type": "constant",
+    "gust_start_s": 2.0,
+    "gust_duration_s": 4.0,
     "mission": {
       "type": "hover",
       "altitude_m": 5.0,
@@ -79,7 +81,9 @@
     "domain_randomization": {
       "enabled": false,
       "trials": 2,
-      "mass_variance_pct": 10.0
+      "mass_variance_pct": 10.0,
+      "thrust_variance_pct": 0.0,
+      "cg_offset_variance_m": 0.0
     }
   },
   "seed": 42,

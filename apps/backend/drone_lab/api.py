@@ -1,4 +1,5 @@
 import asyncio
+from contextlib import asynccontextmanager
 from pathlib import Path
 import os
 import time
@@ -8,6 +9,8 @@ from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import FileResponse, JSONResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
+from dronedesign.evaluators.l2 import SUPPORTED_L2_CONTROLLERS
+from dronedesign.spi import ExternalL3Evaluator
 
 from .core_adapter import check_l1
 from .domain import (
@@ -61,10 +64,22 @@ async def _stream_run(store, run_id, after_seq, initial):
             return
 
 
-def create_app(db_path=None):
+def create_app(db_path=None, *, l3_evaluator: ExternalL3Evaluator | None = None):
+    if l3_evaluator is not None and (not isinstance(l3_evaluator, ExternalL3Evaluator)
+                                     or l3_evaluator.level != "L3" or not l3_evaluator.version):
+        raise ValueError("L3 evaluator must implement ExternalL3Evaluator")
+    @asynccontextmanager
+    async def lifespan(app):
+        try:
+            yield
+        finally:
+            if l3_evaluator is not None:
+                await run_in_threadpool(l3_evaluator.close)
+
     store = Store(db_path or os.getenv("DRONE_LAB_DB", "data/drone_lab.sqlite3"))
-    app = FastAPI(title="翼构 · 无人机设计实验室", version="0.3.0")
+    app = FastAPI(title="翼构 · 无人机设计实验室", version="0.3.0", lifespan=lifespan)
     app.state.store = store
+    app.state.l3_evaluator = l3_evaluator
 
     @app.exception_handler(KeyError)
     async def not_found(request, exc):
@@ -86,9 +101,15 @@ def create_app(db_path=None):
     def defaults():
         request = ExperimentRequest(evaluation_mode="dynamics", optimizer="evolution",
             scenario=TestScenario(scenario_id="wind-hover", duration_s=8, sim_dt_s=0.005))
+        plugin = app.state.l3_evaluator
         return {"request": request.model_dump(mode="json"),
                 "baseline_ir": baseline_ir().model_dump(mode="json"),
-                "capabilities": {"L1": "bounded-hover-allocation", "L2": "6dof-cascaded-pid", "L3": "not-implemented"}}
+                "capabilities": {"L1": "bounded-hover-allocation", "L2": "6dof-cascaded-pid",
+                                 "l2_integrator": "rk4",
+                                 "controllers": list(SUPPORTED_L2_CONTROLLERS),
+                                 "L3": "registered" if plugin is not None else "not-implemented",
+                                 "l3_registered": plugin is not None,
+                                 "l3_version": plugin.version if plugin is not None else None}}
 
     @app.get("/api/presets", response_model=list[PresetSpec])
     def list_presets():

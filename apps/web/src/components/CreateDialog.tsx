@@ -265,6 +265,10 @@ export function CreateDialog({ defaults, baselineIr, presets, presetsError, relo
                   <option value="none">无风</option><option value="constant">恒定风</option><option value="gust">阵风</option></select></label>
                 {WIND_AXES.map((label, axis) => <NumberField key={label} label={label} value={scenario.wind_velocity_m_s[axis]} disabled={scenario.wind_type === 'none'}
                   onChange={value => edit(request => { request.scenario.wind_velocity_m_s[axis] = value; })}/>)}
+                {scenario.wind_type === 'gust' && <>
+                  <NumberField label="阵风开始 / s" value={scenario.gust_start_s} min={0} onChange={value => edit(request => { request.scenario.gust_start_s = value; })}/>
+                  <NumberField label="阵风持续 / s" value={scenario.gust_duration_s} min={0} onChange={value => edit(request => { request.scenario.gust_duration_s = value; })}/>
+                </>}
                 <NumberField label="测试时长 / s" value={scenario.duration_s} min={0} max={600} onChange={value => edit(request => { request.scenario.duration_s = value; })}/>
                 <NumberField label="仿真步长 / s" value={scenario.sim_dt_s} min={0} onChange={value => edit(request => { request.scenario.sim_dt_s = value; })}/>
                 <NumberField label="空气密度 / kg/m³" value={scenario.air_density_kg_m3} min={0} onChange={value => edit(request => { request.scenario.air_density_kg_m3 = value; })}/>
@@ -279,6 +283,8 @@ export function CreateDialog({ defaults, baselineIr, presets, presetsError, relo
                 <div className="create-grid">
                   <NumberField label="随机试验次数" value={randomization.trials} min={1} max={20} step={1} onChange={value => edit(request => { request.scenario.domain_randomization.trials = value; })}/>
                   <NumberField label="重量波动 / %" value={randomization.mass_variance_pct} min={0} max={50} onChange={value => edit(request => { request.scenario.domain_randomization.mass_variance_pct = value; })}/>
+                  <NumberField label="单桨推力波动 / %" value={randomization.thrust_variance_pct} min={0} onChange={value => edit(request => { request.scenario.domain_randomization.thrust_variance_pct = value; })}/>
+                  <NumberField label="三轴质心偏移 / m" value={randomization.cg_offset_variance_m} min={0} onChange={value => edit(request => { request.scenario.domain_randomization.cg_offset_variance_m = value; })}/>
                 </div>
                 {Number.isInteger(randomization.trials) && randomization.trials > 0 && <p className="muted">每个候选增加随机试验 ×{randomization.trials}。计入 1 次基准试飞，总计 ×{randomization.trials + 1} 次模拟。</p>}
               </>}

@@ -29,6 +29,7 @@ export const SEARCH_PARAMETERS: Record<string, { label: string; unit: string; bo
 export const MAX_SEED = 2147483647;
 export const asInputNumber = (value: number) => Number.isFinite(value) ? value : '';
 const positive = (value: number) => Number.isFinite(value) && value > 0;
+const nonnegative = (value: number) => Number.isFinite(value) && value >= 0;
 const integerIn = (value: number, min: number, max: number) => Number.isInteger(value) && value >= min && value <= max;
 
 export function validSearchBounds([low, high]: SearchParameter['bounds']) {
@@ -62,11 +63,17 @@ export function buildFormRequest(draft: ExperimentRequest, startPaused: boolean)
     if (!Number.isFinite(mission.step_time_s) || mission.step_time_s < 0) mission.step_time_s = 1;
   }
   if (scenario.wind_type === 'none' && !scenario.wind_velocity_m_s.every(Number.isFinite)) scenario.wind_velocity_m_s = [0, 0, 0];
+  if (scenario.wind_type !== 'gust') {
+    if (!nonnegative(scenario.gust_start_s)) scenario.gust_start_s = 2;
+    if (!positive(scenario.gust_duration_s)) scenario.gust_duration_s = 4;
+  }
   if (!randomization.enabled) {
     if (!integerIn(randomization.trials, 1, 20)) randomization.trials = 2;
     if (!Number.isFinite(randomization.mass_variance_pct) || randomization.mass_variance_pct < 0 || randomization.mass_variance_pct > 50) {
       randomization.mass_variance_pct = 10;
     }
+    if (!nonnegative(randomization.thrust_variance_pct) || randomization.thrust_variance_pct >= 100) randomization.thrust_variance_pct = 0;
+    if (!nonnegative(randomization.cg_offset_variance_m)) randomization.cg_offset_variance_m = 0;
   }
   for (const fault of scenario.fault_injections) {
     if (fault.fault_type === 'motor_out') fault.severity = 1;
@@ -101,6 +108,9 @@ export function validateFormRequest(request: ExperimentRequest, baseline: DroneI
   if (!positive(scenario.air_density_kg_m3) || !scenario.wind_velocity_m_s.every(Number.isFinite)) {
     return { section: 'advanced', message: '请填写完整的三轴风速和大于 0 的空气密度。' };
   }
+  if (scenario.wind_type === 'gust' && (!nonnegative(scenario.gust_start_s) || !positive(scenario.gust_duration_s))) {
+    return { section: 'advanced', message: '阵风开始时间须大于等于 0，持续时间须大于 0。' };
+  }
   const rotorIds = new Set(aircraft?.rotors.map(rotor => rotor.id));
   for (const [index, fault] of scenario.fault_injections.entries()) {
     if (!Number.isFinite(fault.trigger_time_s) || fault.trigger_time_s < 0 || fault.trigger_time_s >= duration) {
@@ -112,6 +122,10 @@ export function validateFormRequest(request: ExperimentRequest, baseline: DroneI
   if (randomization.enabled && (!integerIn(randomization.trials, 1, 20) || !Number.isFinite(randomization.mass_variance_pct)
     || randomization.mass_variance_pct < 0 || randomization.mass_variance_pct > 50)) {
     return { section: 'advanced', message: '随机试验次数须为 1–20 的整数，重量波动须在 0%–50% 之间。' };
+  }
+  if (randomization.enabled && (!nonnegative(randomization.thrust_variance_pct) || randomization.thrust_variance_pct >= 100
+    || !nonnegative(randomization.cg_offset_variance_m))) {
+    return { section: 'advanced', message: '推力波动须大于等于 0% 且小于 100%，质心偏移须大于等于 0。' };
   }
   if (!goal.objectives.length || goal.objectives.some(objective => !positive(objective.weight))) {
     return { section: 'advanced', message: '至少保留一个优化目标，每项目标的权重须大于 0。' };
@@ -130,7 +144,8 @@ export function validateFormRequest(request: ExperimentRequest, baseline: DroneI
     if (aircraft?.rotors.some(rotor => rotor.thrust_axis[0] !== 0 || rotor.thrust_axis[1] !== 0 || rotor.thrust_axis[2] !== -1)) {
       return { section: 'basic', message: '三维飞行模拟需要使用竖直推力旋翼，请选择兼容的参考机型。' };
     }
-    if (aircraft && Object.keys(aircraft.controller.params).some(key => !['rate_kr', 'rate_kp', 'att_kp', 'pos_kp', 'pos_kd', 'pos_ki'].includes(key))) {
+    const gainNames = aircraft?.controller.type === 'cascaded_pid' ? ['rate_kr', 'rate_kp', 'att_kp', 'pos_kp', 'pos_kd', 'pos_ki'] : [];
+    if (aircraft && Object.keys(aircraft.controller.params).some(key => !gainNames.includes(key))) {
       return { section: 'basic', message: '参考机型包含当前三维飞行模拟不支持的飞控参数。' };
     }
   }

@@ -2,7 +2,7 @@ export type TermKey =
   | 'pareto' | 'only_pareto' | 'multi_objective' | 'convergence'
   | 'l1_screen' | 'l2_sim' | 'drone_ir' | 'seed_ir'
   | 'optimizer_evo' | 'optimizer_nsga2' | 'optimizer_rand' | 'step_response' | 'waypoints'
-  | 'domain_rand' | 'fault_injection' | 'cascaded_pid'
+  | 'domain_rand' | 'fault_injection' | 'cascaded_pid' | 'lqr'
   | 'manual_revision' | 'cache_hits' | 'ned_frame';
 
 export interface TermEntry {
@@ -32,6 +32,7 @@ export const GLOSSARY: Record<TermKey, TermEntry> = {
   domain_rand: { key: 'domain_rand', uiLabel: '制造误差鲁棒测试', techTerm: '域随机化 · Domain Randomization', plainDesc: '模拟机身重量的小幅波动，看看装配有误差时还能不能稳定飞行。' },
   fault_injection: { key: 'fault_injection', uiLabel: '突发故障容错测试', techTerm: '故障注入 · Fault Injection', plainDesc: '在模拟飞行时降低一只旋翼的推力，检查飞机能否稳住。' },
   cascaded_pid: { key: 'cascaded_pid', uiLabel: '双层自动飞控', techTerm: '串级 PID · Cascaded PID Controller', plainDesc: '外层决定往哪里飞，内层调整机身姿态以执行指令。' },
+  lqr: { key: 'lqr', uiLabel: '悬停最优控制（LQR）', techTerm: '线性二次型调节器 · LQR', plainDesc: '用悬停模型自动计算增益，同时调节位置、速度与姿态。' },
   manual_revision: { key: 'manual_revision', uiLabel: '手动微调版', techTerm: '人工修订 · Manual Revision', plainDesc: '手动更改机型参数后提交重评得到的方案，可和原方案对照。' },
   cache_hits: { key: 'cache_hits', uiLabel: '复用历史结果', techTerm: '缓存命中 · Evaluation Cache Hits', plainDesc: '遇到相同配置和测试条件时直接采用已有结果，省去重复计算。' },
   ned_frame: { key: 'ned_frame', uiLabel: '空间坐标（北、东、高度）', techTerm: 'NED 坐标系与 wxyz 四元数 · NED Frame & Quaternion', plainDesc: '界面用北、东和离地高度描述位置，数据文件中的第三轴向下为正。' },

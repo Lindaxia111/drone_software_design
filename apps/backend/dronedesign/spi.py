@@ -7,7 +7,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Literal
+from typing import Literal, Protocol, runtime_checkable
 
 from .schema import DesignGoal, DroneIR, EvalResult, TestScenario
 
@@ -36,6 +36,25 @@ class IEvaluator(ABC):
 
     def close(self) -> None:  # 可选：释放进程池/容器等资源
         return None
+
+
+@runtime_checkable
+class ExternalL3Evaluator(Protocol):
+    """High-fidelity plugin. Return the input identity and evaluator_level='L3' in each result."""
+
+    @property
+    def level(self) -> Literal["L3"]: ...
+
+    @property
+    def version(self) -> str:
+        """Nonempty solver/schema revision used to distinguish cached results."""
+        ...
+
+    async def evaluate(self, ir: DroneIR, scenario: TestScenario) -> EvalResult: ...
+
+    def close(self) -> None:
+        """Release external solver resources. Safe to call after outstanding evaluations finish."""
+        ...
 
 
 class ICompiler(ABC):

@@ -20,6 +20,10 @@ FOM = 0.65  # 桨的品质因数
 MOTOR_ETA = 0.80  # 电机+电调效率
 AVIONICS_W = 5.0  # 航电固定功耗
 USABLE_DOD = 0.80  # 可用放电深度
+PACK_OPEN_CIRCUIT_V = 14.8  # 名义 4S 锂电池组
+PACK_RESISTANCE_OHM = 0.04
+PARASITIC_DRAG_AREA_M2 = (0.035, 0.035, 0.055)  # 机体三轴等效 CdA
+ANGULAR_DAMPING_RATE_S = (0.55, 0.55, 0.30)
 
 
 @dataclass(frozen=True)
@@ -76,3 +80,20 @@ def rotor_power_coeff(ir: DroneIR, rho: float) -> np.ndarray:
     rad = np.array([r.prop_radius_m for r in ir.rotors])
     area = math.pi * rad**2
     return 1.0 / (np.sqrt(2.0 * rho * area) * FOM * MOTOR_ETA)
+
+
+def parasitic_drag_coeff(air_density: float) -> np.ndarray:
+    return 0.5 * air_density * np.asarray(PARASITIC_DRAG_AREA_M2)
+
+
+def angular_drag_coeff(inertia: np.ndarray) -> np.ndarray:
+    return np.diag(inertia) * np.asarray(ANGULAR_DAMPING_RATE_S)
+
+
+def battery_power_limit(max_discharge_w: float) -> float:
+    return min(max_discharge_w, PACK_OPEN_CIRCUIT_V**2 / (4 * PACK_RESISTANCE_OHM))
+
+
+def battery_terminal_voltage(load_w: float) -> float:
+    """High-voltage solution of P = V I and V = V_oc - R I."""
+    return 0.5 * (PACK_OPEN_CIRCUIT_V + math.sqrt(max(0.0, PACK_OPEN_CIRCUIT_V**2 - 4 * PACK_RESISTANCE_OHM * load_w)))

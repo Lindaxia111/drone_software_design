@@ -21,12 +21,27 @@
           "minimum": 0,
           "title": "Mass Variance Pct",
           "type": "number"
+        },
+        "thrust_variance_pct": {
+          "default": 0.0,
+          "exclusiveMaximum": 100,
+          "minimum": 0,
+          "title": "Thrust Variance Pct",
+          "type": "number"
+        },
+        "cg_offset_variance_m": {
+          "default": 0.0,
+          "minimum": 0,
+          "title": "Cg Offset Variance M",
+          "type": "number"
         }
       },
       "required": [
         "enabled",
         "trials",
-        "mass_variance_pct"
+        "mass_variance_pct",
+        "thrust_variance_pct",
+        "cg_offset_variance_m"
       ],
       "title": "DomainRandomization",
       "type": "object"
@@ -231,6 +246,18 @@
       "title": "Wind Type",
       "type": "string"
     },
+    "gust_start_s": {
+      "default": 2.0,
+      "minimum": 0,
+      "title": "Gust Start S",
+      "type": "number"
+    },
+    "gust_duration_s": {
+      "default": 4.0,
+      "exclusiveMinimum": 0,
+      "title": "Gust Duration S",
+      "type": "number"
+    },
     "mission": {
       "$ref": "#/$defs/Mission"
     },
@@ -254,6 +281,8 @@
     "air_density_kg_m3",
     "wind_velocity_m_s",
     "wind_type",
+    "gust_start_s",
+    "gust_duration_s",
     "mission",
     "fault_injections",
     "domain_randomization"

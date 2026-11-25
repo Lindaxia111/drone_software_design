@@ -99,8 +99,11 @@
       "additionalProperties": false,
       "properties": {
         "type": {
-          "const": "cascaded_pid",
           "default": "cascaded_pid",
+          "enum": [
+            "cascaded_pid",
+            "lqr"
+          ],
           "title": "Type",
           "type": "string"
         },

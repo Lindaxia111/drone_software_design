@@ -66,7 +66,7 @@ export type Constraint = {
 };
 
 export type Controller = {
-  "type": "cascaded_pid";
+  "type": "cascaded_pid" | "lqr";
   "auto_scale_gains": boolean;
   "params": Record<string, number>;
 };
@@ -83,6 +83,8 @@ export type DomainRandomization = {
   "enabled": boolean;
   "trials": number;
   "mass_variance_pct": number;
+  "thrust_variance_pct": number;
+  "cg_offset_variance_m": number;
 };
 
 export type DroneIR = {
@@ -272,6 +274,8 @@ export type TestScenario = {
   "air_density_kg_m3": number;
   "wind_velocity_m_s": [number, number, number];
   "wind_type": "none" | "constant" | "gust";
+  "gust_start_s": number;
+  "gust_duration_s": number;
   "mission": Mission;
   "fault_injections": Array<FaultInjection>;
   "domain_randomization": DomainRandomization;

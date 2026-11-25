@@ -96,6 +96,7 @@ class Payload(_Frozen):
 
 
 class Controller(_Frozen):
+    # MPC is retained in historical IR snapshots. L2 advertises its supported subset.
     type: Literal["cascaded_pid", "lqr", "mpc"] = "cascaded_pid"
     auto_scale_gains: bool = True
     params: dict[str, float] = Field(default_factory=dict)
@@ -160,7 +161,7 @@ class Mission(_Frozen):
 
 class Wind(_Frozen):
     type: Literal["none", "constant", "gust"] = "none"
-    # constant：恒定风速；gust：t∈[2,6]s 叠加 1-cos 阵风，峰值为该向量（NED，m/s）
+    # 阵风的 1-cos 包络峰值为该向量（NED，m/s）。
     velocity_m_s: Vec3 = (0.0, 0.0, 0.0)
 
 
@@ -180,6 +181,8 @@ class DomainRandomization(_Frozen):
     enabled: bool = False
     trials: int = Field(default=5, ge=1)
     mass_variance_pct: float = Field(default=10.0, ge=0, allow_inf_nan=False)
+    thrust_variance_pct: float = Field(default=0.0, ge=0, lt=100, allow_inf_nan=False)
+    cg_offset_variance_m: float = Field(default=0.0, ge=0, allow_inf_nan=False)
 
 
 class TestScenario(_Frozen):
@@ -191,6 +194,8 @@ class TestScenario(_Frozen):
     sim_dt_s: float = Field(default=0.004, gt=0, allow_inf_nan=False)
     mission: Mission = Field(default_factory=Mission)
     environment: Environment = Field(default_factory=Environment)
+    gust_start_s: float = Field(default=2.0, ge=0, allow_inf_nan=False)
+    gust_duration_s: float = Field(default=4.0, gt=0, allow_inf_nan=False)
     fault_injections: tuple[FaultInjection, ...] = ()
     domain_randomization: Optional[DomainRandomization] = None
 

@@ -179,7 +179,31 @@ export function Studio({ run, candidate, onRevision, onNewExperiment, embedded =
         <details open id="editor-power" className={state.activePart === 'power' ? 'active-editor' : ''}><summary>能源电池</summary><label className="checkbox-label"><input type="checkbox" checked={coupleBattery} onChange={e => { setCoupleBattery(e.target.checked); if (e.target.checked) edit(d => { d.power.battery_mass_kg = d.power.capacity_wh / 180; }); }}/>按 180 Wh/kg 联动电池质量</label><div className="form-grid"><NumberField label="电池容量 / Wh" number={ir.power.capacity_wh} min={1} change={number => edit(d => { d.power.capacity_wh = number; if (coupleBattery) d.power.battery_mass_kg = number / 180; })}/><NumberField label="电池质量 / kg" number={ir.power.battery_mass_kg} min={0.001} disabled={coupleBattery} change={number => edit(d => { d.power.battery_mass_kg = number; })}/><NumberField label="最大放电功率 / W" number={ir.power.max_discharge_w} min={1} change={number => edit(d => { d.power.max_discharge_w = number; })}/></div></details>
         <details open id="editor-payload" className={state.activePart === 'payload' ? 'active-editor' : ''}><summary>任务载荷</summary><NumberField label="载荷质量 / kg" number={ir.payload.mass_kg} min={0} change={number => edit(d => { d.payload.mass_kg = number; })}/><VectorFields title="载荷位置 / m" vector={ir.payload.position_m} change={(axis, number) => edit(d => { d.payload.position_m[axis] = number; })}/></details>
         <details id="editor-airframe" className={state.activePart === 'airframe' ? 'active-editor' : ''}><summary>机身与质量特性</summary><NumberField label="机身基础质量 / kg" number={ir.airframe.base_mass_kg} min={0.001} change={number => edit(d => { d.airframe.base_mass_kg = number; })}/><VectorFields title="机身重心 / m" vector={ir.airframe.cg_offset_m} change={(axis, number) => edit(d => { d.airframe.cg_offset_m[axis] = number; })}/><VectorFields title="机身惯量对角 / kg·m²" vector={ir.airframe.inertia_diag_kg_m2} change={(axis, number) => edit(d => { d.airframe.inertia_diag_kg_m2[axis] = number; })}/><VectorFields title="线性阻力系数" vector={ir.airframe.linear_drag_coeff} change={(axis, number) => edit(d => { d.airframe.linear_drag_coeff[axis] = number; })}/></details>
-        <details id="editor-controller" className={state.activePart === 'controller' ? 'active-editor' : ''}><summary>控制器与增益</summary><div className="form-field"><div className="form-field-heading"><label htmlFor={controllerTypeId}>控制器类型</label><TermTooltip term="cascaded_pid" showIconOnly/></div><select id={controllerTypeId} value={ir.controller.type} disabled><option value="cascaded_pid">{GLOSSARY.cascaded_pid.uiLabel}</option></select></div><label className="checkbox-label"><input type="checkbox" checked={ir.controller.auto_scale_gains} onChange={e => edit(d => { d.controller.auto_scale_gains = e.target.checked; })}/>自动缩放控制增益</label><div className="form-grid">{['pos_kp', 'pos_kd', 'pos_ki', 'att_kp', ir.controller.auto_scale_gains ? 'rate_kr' : 'rate_kp'].map(key => <label key={key}>{key}（覆盖默认值）<input type="number" step="any" value={ir.controller.params[key] ?? ''} placeholder="使用模型默认值" onChange={e => edit(d => { if (e.target.value === '') delete d.controller.params[key]; else d.controller.params[key] = Number(e.target.value); })}/></label>)}</div></details>
+        <details id="editor-controller" className={state.activePart === 'controller' ? 'active-editor' : ''}>
+          <summary>控制器与增益</summary>
+          <div className="form-field">
+            <div className="form-field-heading"><label htmlFor={controllerTypeId}>控制器类型</label><TermTooltip term={ir.controller.type} showIconOnly/></div>
+            <select id={controllerTypeId} value={ir.controller.type} onChange={e => edit(d => {
+              d.controller.type = e.target.value as DroneIR['controller']['type'];
+              d.controller.params = {};
+            })}>
+              <option value="cascaded_pid">{GLOSSARY.cascaded_pid.uiLabel}</option>
+              <option value="lqr">{GLOSSARY.lqr.uiLabel}</option>
+            </select>
+          </div>
+          {ir.controller.type === 'cascaded_pid' && <>
+            <label className="checkbox-label"><input type="checkbox" checked={ir.controller.auto_scale_gains}
+              onChange={e => edit(d => { d.controller.auto_scale_gains = e.target.checked; })}/>自动缩放控制增益</label>
+            <div className="form-grid">
+              {['pos_kp', 'pos_kd', 'pos_ki', 'att_kp', ir.controller.auto_scale_gains ? 'rate_kr' : 'rate_kp'].map(key =>
+                <label key={key}>{key}（覆盖默认值）<input type="number" step="any" value={ir.controller.params[key] ?? ''}
+                  placeholder="使用模型默认值" onChange={e => edit(d => {
+                    if (e.target.value === '') delete d.controller.params[key];
+                    else d.controller.params[key] = Number(e.target.value);
+                  })}/></label>)}
+            </div>
+          </>}
+        </details>
       </fieldset></div>
     </div>
     <div className="studio-feedback">{live.errors.map(text => <p className="validation-bad" key={text}>{text}</p>)}{live.warnings.map(text => <p className="validation-warning" key={text}>{text}</p>)}{error && <p className="form-error" role="alert">{error}</p>}</div>

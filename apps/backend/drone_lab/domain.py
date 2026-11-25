@@ -62,7 +62,7 @@ class Payload(Model):
 
 
 class Controller(Model):
-    type: Literal["cascaded_pid"] = "cascaded_pid"
+    type: Literal["cascaded_pid", "lqr"] = "cascaded_pid"
     auto_scale_gains: bool = True
     params: dict[str, float] = Field(default_factory=dict)
 
@@ -176,6 +176,8 @@ class DomainRandomization(Model):
     enabled: bool = False
     trials: int = Field(default=2, ge=1, le=20)
     mass_variance_pct: float = Field(default=10, ge=0, le=50)
+    thrust_variance_pct: float = Field(default=0.0, ge=0, lt=100, allow_inf_nan=False)
+    cg_offset_variance_m: Nonnegative = 0.0
 
 
 class TestScenario(Model):
@@ -186,6 +188,8 @@ class TestScenario(Model):
     air_density_kg_m3: Positive = 1.225
     wind_velocity_m_s: Vector3 = (1, 0, 0)
     wind_type: Literal["none", "constant", "gust"] = "constant"
+    gust_start_s: Nonnegative = 2.0
+    gust_duration_s: Positive = 4.0
     mission: Mission = Field(default_factory=Mission)
     fault_injections: list[FaultInjection] = Field(default_factory=list, max_length=20)
     domain_randomization: DomainRandomization = Field(default_factory=DomainRandomization)
@@ -227,7 +231,8 @@ class ExperimentRequest(Model):
                 raise ValueError("动力学步长须 ≤0.01 秒且 ≤最小电机时间常数的一半")
             if any(r.thrust_axis != (0, 0, -1) for r in ir.rotors):
                 raise ValueError("当前动力学控制器仅支持竖直推力旋翼")
-            if set(ir.controller.params)-{"rate_kr", "rate_kp", "att_kp", "pos_kp", "pos_kd", "pos_ki"}:
+            gain_names = {"rate_kr", "rate_kp", "att_kp", "pos_kp", "pos_kd", "pos_ki"} if ir.controller.type == "cascaded_pid" else set()
+            if set(ir.controller.params) - gain_names:
                 raise ValueError("控制器包含当前动力学模型不支持的增益参数")
         return self
 

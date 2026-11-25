@@ -1,9 +1,13 @@
+import math
 import time
 
+import numpy as np
 import pytest
 
 from dronedesign.evaluators import evaluate_l1_sync, evaluate_l2_sync
+from dronedesign.evaluators.l2 import _perturbed, _reference, _rk4_step, _trial_inputs, _wind, simulate
 from dronedesign.irtools import apply_params, make_multirotor
+from dronedesign.physics import PACK_OPEN_CIRCUIT_V, battery_terminal_voltage, mass_properties
 from dronedesign.schema import (
     Controller,
     DomainRandomization,
@@ -94,6 +98,98 @@ def test_l2_waypoints_mission_runs():
     assert evaluate_l2_sync(make_multirotor(), sc).status == "PASSED"
 
 
+def test_rk4_exhibits_fourth_order_convergence_and_normalizes_replay():
+    def integration_error(steps):
+        y = np.array([1.0])
+        for k in range(steps):
+            y = _rk4_step(lambda t, state: -2 * state, k / steps, y, 1 / steps)
+        return abs(y[0] - math.exp(-2))
+
+    assert 12 < integration_error(8) / integration_error(16) < 20
+    scenario = TestScenario(scenario_id="rk4", duration_s=8, sim_dt_s=0.01,
+                            mission=Mission(type="step_response", step_m=(1, 0.3, -0.15)))
+    ir = make_multirotor()
+    coarse = evaluate_l2_sync(ir, scenario, record_every=1)
+    fine = evaluate_l2_sync(ir, scenario.model_copy(update={"sim_dt_s": 0.005}))
+    assert coarse.status == fine.status == "PASSED"
+    assert coarse.metrics["tracking_rmse_m"] == pytest.approx(fine.metrics["tracking_rmse_m"], abs=0.01)
+    np.testing.assert_allclose(np.linalg.norm(np.array(coarse.replay_frames)[:, 4:8], axis=1), 1, atol=2e-15, rtol=0)
+
+
+def test_quintic_waypoint_reference_is_continuous_and_supplies_velocity():
+    scenario = TestScenario(scenario_id="reference", duration_s=5, mission=Mission(type="waypoints", waypoints=[
+        {"t_s": 2, "position_m": [2, 0, -5]}, {"t_s": 4, "position_m": [2, 3, -6]},
+    ]))
+    start, reference = _reference(scenario)
+    np.testing.assert_array_equal(start, [0, 0, -5])
+    pos, velocity = reference(1)
+    np.testing.assert_allclose(pos, [1, 0, -5])
+    np.testing.assert_allclose(velocity, [1.875, 0, 0])
+    for t, expected in [(0, start), (2, [2, 0, -5]), (4, [2, 3, -6]), (5, [2, 3, -6])]:
+        pos, velocity = reference(t)
+        np.testing.assert_array_equal(pos, expected)
+        np.testing.assert_array_equal(velocity, [0, 0, 0])
+    h = 1e-5
+    for t in (1, 2, 3):
+        before, v_before = reference(t - h)
+        after, v_after = reference(t + h)
+        np.testing.assert_allclose((after - before) / (2*h), reference(t)[1], atol=1e-8)
+        if t == 2:
+            np.testing.assert_allclose((v_after - v_before) / (2*h), 0, atol=1e-4)
+
+
+def test_lqr_rejects_a_gust_and_returns_to_hover():
+    ir = make_multirotor().model_copy(update={"controller": Controller(type="lqr")}).finalize()
+    gust = TestScenario(scenario_id="gust", duration_s=10, sim_dt_s=0.01, gust_start_s=0.5, gust_duration_s=2,
+                        environment=Environment(wind=Wind(type="gust", velocity_m_s=(4, 0, 0))))
+    np.testing.assert_allclose(_wind(gust, 1.5), [4, 0, 0])
+    for t in (0.4, 0.5, 2.5, 3):
+        np.testing.assert_allclose(_wind(gust, t), 0, atol=1e-14)
+    legacy = HOVER.model_copy(update={"environment": gust.environment})
+    np.testing.assert_allclose(_wind(legacy, 4), [4, 0, 0])
+    result = evaluate_l2_sync(ir, gust)
+    assert result.status == "PASSED"
+    assert result.metrics["max_pos_err_m"] > 0.03
+    assert result.metrics["final_pos_err_m"] < 0.02
+    assert result.metrics["max_tilt_deg"] < 10
+
+
+def test_mass_thrust_and_cg_randomization_apply_and_reproduce():
+    ir = make_multirotor()
+    sc = HOVER.model_copy(update={"duration_s": 4, "sim_dt_s": 0.01, "domain_randomization": DomainRandomization(
+        enabled=True, trials=2, mass_variance_pct=8, thrust_variance_pct=7, cg_offset_variance_m=0.006,
+    )})
+    nominal, (mass, thrust, cg), _ = list(_trial_inputs(ir, sc, 43))
+    assert nominal == (1.0, 1.0, (0.0, 0.0, 0.0))
+    assert 0.92 <= mass <= 1.08 and mass != 1
+    assert np.all((0.93 <= thrust) & (thrust <= 1.07)) and np.ptp(thrust) > 0
+    assert np.all(np.abs(cg) <= 0.006) and np.linalg.norm(cg) > 0
+    props_mass = mass_properties(_perturbed(ir, mass, np.zeros(3)))
+    props_cg = mass_properties(_perturbed(ir, mass, cg))
+    np.testing.assert_allclose(props_cg.cg - props_mass.cg, cg)
+    reversed_ir = ir.model_copy(update={"rotors": ir.rotors[::-1]})
+    np.testing.assert_array_equal(list(_trial_inputs(reversed_ir, sc, 43))[1][1], thrust[::-1])
+    for kw in ({"mass_scale": mass}, {"thrust_scale": thrust}, {"cg_shift_m": cg}):
+        assert simulate(ir, sc, **kw).metrics["tracking_rmse_m"] > 1e-4
+    result = evaluate_l2_sync(ir, sc, seed=43, record_every=20)
+    assert result.status == "PASSED"
+    assert result.metrics == evaluate_l2_sync(ir, sc, seed=43).metrics
+    assert result.metrics != evaluate_l2_sync(ir, sc, seed=44).metrics
+    assert result.metrics["tracking_rmse_m_worst"] >= result.metrics["tracking_rmse_m"] > 0
+    assert result.replay_frames == simulate(ir, sc, record_every=20).frames
+
+
+def test_battery_sag_lowers_thrust_limit_under_load():
+    assert battery_terminal_voltage(0) == PACK_OPEN_CIRCUIT_V
+    assert battery_terminal_voltage(300) < battery_terminal_voltage(200) < PACK_OPEN_CIRCUIT_V
+    barely_above_hover = make_multirotor(max_thrust_n=4.35)
+    nominal = evaluate_l2_sync(make_multirotor(), HOVER)
+    sagged = evaluate_l2_sync(barely_above_hover, HOVER)
+    assert nominal.status == "PASSED" and nominal.metrics["min_battery_voltage_v"] < PACK_OPEN_CIRCUIT_V
+    assert sagged.status == "CRASHED"
+    assert sagged.metrics["saturation_frac"] == 1.0
+
+
 def test_l2_underpowered_vehicle_crashes():
     r = evaluate_l2_sync(make_multirotor(max_thrust_n=3.0), HOVER)
     assert r.status == "CRASHED" and "crashed" in rules(r)
@@ -117,8 +213,8 @@ def test_l2_partial_thrust_loss_is_survivable():
 
 
 def test_l2_bad_inputs_are_contained():
-    lqr = make_multirotor().model_copy(update={"controller": Controller(type="lqr")})
-    assert "unsupported_controller" in rules(evaluate_l2_sync(lqr, HOVER))
+    mpc = make_multirotor().model_copy(update={"controller": Controller(type="mpc")})
+    assert "unsupported_controller" in rules(evaluate_l2_sync(mpc, HOVER))
     f = (FaultInjection(trigger_time_s=1.0, target_rotor_id="nope", fault_type="motor_out", severity=1.0),)
     r = evaluate_l2_sync(make_multirotor(), TestScenario(scenario_id="x", duration_s=3, fault_injections=f))
     assert r.status == "CRASHED" and "nope" in (r.error or "")
