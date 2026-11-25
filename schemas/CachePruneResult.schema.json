@@ -1,0 +1,19 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "deleted": {
+      "title": "Deleted",
+      "type": "integer"
+    },
+    "remaining": {
+      "title": "Remaining",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "deleted",
+    "remaining"
+  ],
+  "title": "CachePruneResult",
+  "type": "object"
+}

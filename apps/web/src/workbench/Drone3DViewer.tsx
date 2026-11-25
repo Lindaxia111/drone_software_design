@@ -1,20 +1,25 @@
-import { memo, useEffect, useRef, useState } from 'react';
+import { memo, useEffect, useRef, useState, type MutableRefObject, type RefObject } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import type { DroneIR } from '../contracts';
-import type { CameraPreset } from './state';
+import type { DroneIR, ReplayData } from '../contracts';
+import type { CameraPreset, ModelCameraPose } from './state';
 import { frdToScene, inspectIR } from './geometry';
+import { applyReplayPose, toSceneFrames, type SceneFrame } from './replay';
 
 interface Props {
   ir: DroneIR; modelKey: string; explode: number; spinning: boolean;
   activePart: string | null; camera: CameraPreset; reset: number;
-  onPart: (part: string) => void;
+  onPart?: (part: string) => void;
+  modelCamera?: MutableRefObject<ModelCameraPose | null>;
+  replay?: ReplayData;
+  replayTime?: RefObject<number>;
 }
 interface Moving { object: THREE.Object3D; base: THREE.Vector3; offset: THREE.Vector3 }
 interface Engine {
   renderer: THREE.WebGLRenderer; scene: THREE.Scene; camera: THREE.PerspectiveCamera; controls: OrbitControls;
-  model: THREE.Group; moving: Moving[]; props: { object: THREE.Object3D; sign: number }[];
+  model: THREE.Group; grid: THREE.GridHelper; moving: Moving[]; props: { object: THREE.Object3D; sign: number }[];
   radius: number; visible: boolean;
+  replay: { frames: SceneFrame[]; line: THREE.Line; center: THREE.Vector3; radius: number } | null;
 }
 
 function dispose(group: THREE.Object3D) {
@@ -36,10 +41,20 @@ function label(text: string, color: string, position: THREE.Vector3) {
   sprite.position.copy(position); sprite.scale.set(0.25, 0.0625, 1); return sprite;
 }
 
-function fit(engine: Engine, preset: CameraPreset) {
-  const radius = Math.max(engine.radius, 0.45);
+function fit(engine: Engine, { camera: preset, reset, modelCamera }: Props) {
+  const radius = Math.max(engine.replay?.radius ?? engine.radius, 0.45);
+  engine.controls.maxDistance = engine.replay ? Math.max(15, radius * 15) : 15;
+  engine.camera.far = Math.max(100, engine.controls.maxDistance * 2);
+  engine.camera.updateProjectionMatrix();
+  const saved = modelCamera?.current;
+  if (!engine.replay && saved?.preset === preset && saved.reset === reset) {
+    engine.camera.position.fromArray(saved.position);
+    engine.controls.target.fromArray(saved.target);
+    engine.controls.update();
+    return;
+  }
   const direction = preset === 'top' ? new THREE.Vector3(0, 3, 0.001) : preset === 'side' ? new THREE.Vector3(3, 0.3, 0.02) : new THREE.Vector3(1.65, 1.25, 1.65);
-  const target = new THREE.Vector3(0, 0.04, 0);
+  const target = engine.replay?.center ?? new THREE.Vector3(0, 0.04, 0);
   const aspectScale = Math.max(1, 1 / engine.camera.aspect);
   engine.camera.position.copy(direction.multiplyScalar(radius * aspectScale)).add(target);
   engine.controls.target.copy(target); engine.camera.lookAt(target); engine.controls.update();
@@ -69,10 +84,10 @@ function Drone3DViewer(props: Props) {
     const fill = new THREE.DirectionalLight('#b1b0ff', 1.4); fill.position.set(-2, 0.7, -2); scene.add(fill);
     const grid = new THREE.GridHelper(4, 40, '#ccd3e4', '#e1e5ef'); grid.position.y = -0.22; scene.add(grid);
     const model = new THREE.Group(); scene.add(model);
-    const e: Engine = { renderer, scene, camera, controls, model, moving: [], props: [], radius: 0.6, visible: true }; engine.current = e;
+    const e: Engine = { renderer, scene, camera, controls, model, grid, moving: [], props: [], radius: 0.6, visible: true, replay: null }; engine.current = e;
     const resize = new ResizeObserver(() => {
       const width = Math.max(1, element.clientWidth), height = Math.max(1, element.clientHeight);
-      renderer.setSize(width, height); camera.aspect = width / height; camera.updateProjectionMatrix(); fit(e, current.current.camera);
+      renderer.setSize(width, height); camera.aspect = width / height; camera.updateProjectionMatrix();
     }); resize.observe(element);
     renderer.setSize(element.clientWidth || 480, element.clientHeight || 320);
     camera.aspect = (element.clientWidth || 480) / (element.clientHeight || 320); camera.updateProjectionMatrix();
@@ -81,6 +96,7 @@ function Drone3DViewer(props: Props) {
     let down = [0, 0];
     const onDown = (event: PointerEvent) => { down = [event.clientX, event.clientY]; };
     const onUp = (event: PointerEvent) => {
+      if (!current.current.onPart) return;
       if (Math.hypot(event.clientX - down[0], event.clientY - down[1]) > 5) return;
       const bounds = renderer.domElement.getBoundingClientRect();
       pointer.set((event.clientX - bounds.left) / bounds.width * 2 - 1, -(event.clientY - bounds.top) / bounds.height * 2 + 1);
@@ -96,6 +112,7 @@ function Drone3DViewer(props: Props) {
       frame = requestAnimationFrame(render);
       const delta = Math.min(0.05, (now - previous) / 1000); previous = now;
       if (!e.visible || document.hidden) return;
+      if (e.replay) applyReplayPose(e.replay.frames, current.current.replayTime?.current ?? e.replay.frames[0].time, model);
       factor += (current.current.explode - factor) * Math.min(1, delta * 12);
       for (const part of e.moving) part.object.position.copy(part.base).addScaledVector(part.offset, factor);
       if (current.current.spinning) for (const prop of e.props) prop.object.rotation.y += delta * 18 * prop.sign;
@@ -108,6 +125,8 @@ function Drone3DViewer(props: Props) {
     };
     frame = requestAnimationFrame(render);
     return () => {
+      const { modelCamera, camera: preset, reset } = current.current;
+      if (modelCamera && !e.replay) modelCamera.current = { position: camera.position.toArray(), target: controls.target.toArray(), preset, reset };
       cancelAnimationFrame(frame); resize.disconnect(); visible.disconnect(); controls.dispose();
       renderer.domElement.removeEventListener('pointerdown', onDown); renderer.domElement.removeEventListener('pointerup', onUp);
       renderer.domElement.removeEventListener('webglcontextlost', lost);
@@ -164,7 +183,40 @@ function Drone3DViewer(props: Props) {
     e.radius = Math.max(0.46, ...ir.rotors.map(r => Math.hypot(...r.position_m) + r.prop_radius_m)) + 0.2;
   }, [irKey]);
 
-  useEffect(() => { if (engine.current) fit(engine.current, props.camera); }, [props.camera, props.reset, props.modelKey]);
-  return <div className="drone-canvas-wrap"><div className="drone-canvas" ref={host} data-webgl={unavailable ? 'unavailable' : 'ready'}/>{unavailable && <div className="webgl-fallback">当前设备暂不支持 WebGL。参数修订、校验与导出仍然可用。</div>}<div className="canvas-caption">拖拽旋转 · 滚轮缩放 · 点击部件查参</div><div className="axis-key"><span className="axis-f">F 前</span><span className="axis-r">R 右</span><span className="axis-d">D 下</span></div></div>;
+  useEffect(() => {
+    const e = engine.current;
+    if (!e) return;
+    if (e.replay) {
+      e.scene.remove(e.replay.line);
+      dispose(e.replay.line);
+      e.replay = null;
+    }
+    e.model.position.set(0, 0, 0);
+    e.model.quaternion.identity();
+    e.grid.position.set(0, -0.22, 0);
+    e.grid.scale.setScalar(1);
+    const frames = toSceneFrames(props.replay?.frames ?? []);
+    if (frames.length) {
+      const positions = frames.map(frame => frame.position);
+      const bounds = new THREE.Box3().setFromPoints(positions);
+      const center = bounds.getCenter(new THREE.Vector3());
+      const radius = bounds.getSize(new THREE.Vector3()).length() / 2 + e.radius;
+      const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints(positions), new THREE.LineBasicMaterial({ color: '#6252d2' }));
+      e.scene.add(line);
+      e.replay = { frames, line, center, radius };
+      e.grid.position.set(center.x, 0, center.z);
+      e.grid.scale.setScalar(Math.max(1, radius));
+      applyReplayPose(frames, current.current.replayTime?.current ?? frames[0].time, e.model);
+    }
+    e.renderer.domElement.setAttribute('aria-label', frames.length ? '无人机三维飞行回放' : '无人机三维构型');
+  }, [props.replay]);
+
+  useEffect(() => { if (engine.current) fit(engine.current, current.current); }, [props.camera, props.reset, props.modelKey, props.replay]);
+  return <div className="drone-canvas-wrap">
+    <div className="drone-canvas" ref={host} data-webgl={unavailable ? 'unavailable' : 'ready'}/>
+    {unavailable && <div className="webgl-fallback">当前设备暂不支持 WebGL。参数修订、校验与导出仍然可用。</div>}
+    <div className="canvas-caption">拖拽旋转 · 滚轮缩放{props.replay ? ' · 紫线为飞行轨迹' : ' · 点击部件查参'}</div>
+    <div className="axis-key"><span className="axis-f">F 前</span><span className="axis-r">R 右</span><span className="axis-d">D 下</span></div>
+  </div>;
 }
 export default memo(Drone3DViewer);

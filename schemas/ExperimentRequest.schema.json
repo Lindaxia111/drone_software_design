@@ -857,7 +857,8 @@
       "default": "random",
       "enum": [
         "random",
-        "evolution"
+        "evolution",
+        "nsga2"
       ],
       "title": "Optimizer",
       "type": "string"

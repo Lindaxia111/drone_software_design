@@ -1,4 +1,4 @@
-"""Phase 1 random search. Stateless proposal indices form a durable checkpoint."""
+"""Reconstruct optimizers from the durable proposal order and evaluation history."""
 import random
 import math
 from .domain import DroneIR, EvalResult, ExperimentRequest, baseline_ir
@@ -37,6 +37,32 @@ class RandomOptimizer:
         pass
 
 
+def _search_configuration(request):
+    from dronedesign import schema as core
+    from dronedesign.irtools import apply_params
+    from .core_adapter import from_core_ir, to_core_ir
+    from .parameter_tools import parameter_value
+
+    aircraft = to_core_ir(request.seed_ir or baseline_ir())
+    dimensions, fixed = [], {}
+    for parameter in request.goal.search_space:
+        path = "power.capacity_wh_coupled" if parameter.param_path == "power.capacity_wh" else parameter.param_path
+        if parameter.bounds[0] == parameter.bounds[1]:
+            fixed[path] = parameter.bounds[0]
+        else:
+            dimensions.append(core.SearchDimension(param_path=path, type="continuous", bounds=parameter.bounds))
+    if fixed:
+        aircraft = apply_params(aircraft, fixed)
+    for dimension in dimensions:
+        current = parameter_value(from_core_ir(aircraft), dimension.param_path)
+        lo, hi = dimension.bounds
+        aircraft = apply_params(aircraft, {dimension.param_path: max(lo, min(hi, current))})
+    goal = core.DesignGoal(goal_id="persistent", name=request.goal.name, search_space=dimensions,
+        constraints=[core.Constraint.model_validate(c.model_dump()) for c in request.goal.constraints],
+        objectives=[core.Objective.model_validate(o.model_dump()) for o in request.goal.objectives])
+    return goal, aircraft
+
+
 class EvolutionOptimizer:
     """Replay completed generations to reconstruct the reference optimizer after restart.
 
@@ -51,32 +77,13 @@ class EvolutionOptimizer:
 
     def suggest(self, request, index, history, run_id):
         from dronedesign import schema as core
-        from dronedesign.irtools import apply_params
         from dronedesign.optimizers import EvolutionStrategyOptimizer
-        from .core_adapter import to_core_ir, from_core_ir
+        from .core_adapter import from_core_ir
 
         generation, offset = divmod(index, request.goal.budget.batch_size)
         key = (run_id, request.model_dump_json(), generation)
         if key != self._batch_key:
-            aircraft = to_core_ir(request.seed_ir or baseline_ir())
-            dimensions, fixed = [], {}
-            for p in request.goal.search_space:
-                path = "power.capacity_wh_coupled" if p.param_path == "power.capacity_wh" else p.param_path
-                if p.bounds[0] == p.bounds[1]:
-                    fixed[path] = p.bounds[0]
-                else:
-                    dimensions.append(core.SearchDimension(param_path=path, type="continuous", bounds=p.bounds))
-            if fixed:
-                aircraft = apply_params(aircraft, fixed)
-            # Project seed into the configured search space before using it as a proposal.
-            for p in dimensions:
-                from .parameter_tools import parameter_value
-                current = parameter_value(from_core_ir(aircraft), p.param_path)
-                value = max(p.bounds[0], min(p.bounds[1], current))
-                aircraft = apply_params(aircraft, {p.param_path: value})
-            goal = core.DesignGoal(goal_id="persistent", name=request.goal.name, search_space=dimensions,
-                constraints=[core.Constraint.model_validate(c.model_dump()) for c in request.goal.constraints],
-                objectives=[core.Objective.model_validate(o.model_dump()) for o in request.goal.objectives])
+            goal, aircraft = _search_configuration(request)
             optimizer = EvolutionStrategyOptimizer(seed=request.seed)
             optimizer.init(goal, aircraft)
             batch_size = request.goal.budget.batch_size
@@ -104,3 +111,45 @@ class EvolutionOptimizer:
         scales = {"flight_time_min": 30, "tracking_rmse_m": 0.3, "total_mass_kg": 1.5, "hover_power_w": 300}
         return sum(o.weight * candidate["metrics"].get(o.metric, 0)/scales.get(o.metric, 1)
                    * (1 if o.direction == "maximize" else -1) for o in request.goal.objectives)
+
+
+class NSGA2Search:
+    version = "core-nsga2/1.0.0"
+
+    def __init__(self):
+        self._request_key = None
+
+    def suggest(self, request, index, history, run_id):
+        from dronedesign.schema import EvalResult as CoreResult
+        from dronedesign.optimizers import NSGA2Optimizer
+        from .core_adapter import from_core_ir
+
+        size = request.goal.budget.batch_size
+        generation, offset = divmod(index, size)
+        key = (run_id, request.model_dump_json())
+        if key != self._request_key or generation < self._generation:
+            goal, aircraft = _search_configuration(request)
+            self._optimizer = NSGA2Optimizer(seed=request.seed)
+            self._optimizer.init(goal, aircraft)
+            self._proposals = self._optimizer.suggest(size)
+            self._batch = [from_core_ir(ir) for ir in self._proposals]
+            self._generation = 0
+            self._request_key = key
+
+        while self._generation < generation:
+            start = self._generation * size
+            observations = []
+            for i, proposal in enumerate(self._proposals, start):
+                candidate = history[i]
+                status = candidate["status"]
+                observations.append(CoreResult(ir_hash=proposal.ir_hash, scenario_id=request.scenario.scenario_id,
+                    evaluator_level="L2", status=status if status in {"PASSED", "REJECTED_CONSTRAINT", "CRASHED", "TIMEOUT"} else "CRASHED",
+                    metrics=candidate["metrics"], violations=candidate["violations"]))
+            self._optimizer.observe(observations)
+            self._proposals = self._optimizer.suggest(size)
+            self._batch = [from_core_ir(ir) for ir in self._proposals]
+            self._generation += 1
+        return self._batch[offset]
+
+
+OPTIMIZER_VERSIONS = {"random": RandomOptimizer.version, "evolution": EvolutionOptimizer.version, "nsga2": NSGA2Search.version}

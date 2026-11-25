@@ -74,6 +74,13 @@ def constraint_violations(metrics, constraints):
     return violations
 
 
+def apply_goal_constraints(result, goal):
+    if result.status == "PASSED":
+        result.violations.extend(constraint_violations(result.metrics, goal.constraints))
+        if result.violations:
+            result.status = "REJECTED_CONSTRAINT"
+
+
 def pareto_indices(candidates, objectives):
     eligible = [c for c in candidates if c["status"] == "PASSED" and all(o.metric in c["metrics"] for o in objectives)]
     def vector(c):

@@ -1,0 +1,31 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "max_entries": {
+      "default": 2000,
+      "maximum": 9223372036854775807,
+      "minimum": 0,
+      "title": "Max Entries",
+      "type": "integer"
+    },
+    "max_age_days": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Max Age Days"
+    }
+  },
+  "required": [
+    "max_entries",
+    "max_age_days"
+  ],
+  "title": "CachePruneRequest",
+  "type": "object"
+}

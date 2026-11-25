@@ -211,7 +211,7 @@ def simulate(
 
     for k in range(n_steps):
         t = k * dt
-        if wall_deadline is not None and (k & 255) == 0 and time.perf_counter() > wall_deadline:
+        if wall_deadline is not None and time.perf_counter() >= wall_deadline:
             raise SimTimeout()
 
         # 故障：物理立即生效；控制分配延迟得知

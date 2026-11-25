@@ -1,0 +1,92 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "status": {
+      "const": "ok",
+      "default": "ok",
+      "title": "Status",
+      "type": "string"
+    },
+    "stage": {
+      "default": 2,
+      "title": "Stage",
+      "type": "integer"
+    },
+    "verification_level": {
+      "const": "DYNAMICS",
+      "default": "DYNAMICS",
+      "title": "Verification Level",
+      "type": "string"
+    },
+    "version": {
+      "default": "0.3.0",
+      "title": "Version",
+      "type": "string"
+    },
+    "worker_alive": {
+      "title": "Worker Alive",
+      "type": "boolean"
+    },
+    "worker_status": {
+      "anyOf": [
+        {
+          "enum": [
+            "idle",
+            "busy"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Worker Status"
+    },
+    "worker_last_heartbeat": {
+      "anyOf": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Worker Last Heartbeat"
+    },
+    "active_run_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Active Run Id"
+    },
+    "active_candidate_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Active Candidate Id"
+    }
+  },
+  "required": [
+    "status",
+    "stage",
+    "verification_level",
+    "version",
+    "worker_alive",
+    "worker_status",
+    "worker_last_heartbeat",
+    "active_run_id",
+    "active_candidate_id"
+  ],
+  "title": "HealthStatus",
+  "type": "object"
+}

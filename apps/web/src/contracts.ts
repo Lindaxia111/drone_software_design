@@ -28,6 +28,16 @@ export type Budget = {
   "timeout_sec": number;
 };
 
+export type CachePruneRequest = {
+  "max_entries": number;
+  "max_age_days": number | null;
+};
+
+export type CachePruneResult = {
+  "deleted": number;
+  "remaining": number;
+};
+
 export type CandidateDetails = {
   "candidate": CandidateRecord;
   "request": ExperimentRequest;
@@ -113,7 +123,7 @@ export type ExperimentRequest = {
   "seed": number;
   "seed_ir": DroneIR | null;
   "evaluation_mode": "demo" | "dynamics";
-  "optimizer": "random" | "evolution";
+  "optimizer": "random" | "evolution" | "nsga2";
   "start_paused": boolean;
 };
 
@@ -146,6 +156,24 @@ export type FaultInjection = {
   "severity": number;
 };
 
+export type HealthStatus = {
+  "status": "ok";
+  "stage": number;
+  "verification_level": "DYNAMICS";
+  "version": string;
+  "worker_alive": boolean;
+  "worker_status": "idle" | "busy" | null;
+  "worker_last_heartbeat": number | null;
+  "active_run_id": string | null;
+  "active_candidate_id": string | null;
+};
+
+export type L1CheckRequest = {
+  "drone_ir": DroneIR;
+  "goal": DesignGoal;
+  "scenario": TestScenario;
+};
+
 export type Mission = {
   "type": "hover" | "step_response" | "waypoints";
   "altitude_m": number;
@@ -169,6 +197,19 @@ export type Power = {
   "battery_mass_kg": number;
   "capacity_wh": number;
   "max_discharge_w": number;
+};
+
+export type PresetSpec = {
+  "id": string;
+  "title": string;
+  "summary": string;
+  "difficulty": "starter" | "intermediate" | "advanced";
+  "estimated_sec": number;
+  "request": ExperimentRequest;
+};
+
+export type RenameRunRequest = {
+  "name": string;
 };
 
 export type ReplayData = {

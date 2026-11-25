@@ -1,4 +1,4 @@
-"""(μ+λ) 进化策略：单目标（加权适应度）。多目标 NSGA-II 属于阶段二（PyMOO）。"""
+"""(μ+λ) 进化策略：单目标（加权适应度）。"""
 from __future__ import annotations
 
 import numpy as np

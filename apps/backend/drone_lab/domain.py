@@ -6,7 +6,7 @@ import json
 import math
 from typing import Annotated, Literal, Protocol
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_validator
 
 Positive = Annotated[float, Field(gt=0, allow_inf_nan=False)]
 Nonnegative = Annotated[float, Field(ge=0, allow_inf_nan=False)]
@@ -210,7 +210,7 @@ class ExperimentRequest(Model):
     seed_ir: DroneIR | None = None
     # Legacy snapshots without these fields must retain their old interpretation.
     evaluation_mode: Literal["demo", "dynamics"] = "demo"
-    optimizer: Literal["random", "evolution"] = "random"
+    optimizer: Literal["random", "evolution", "nsga2"] = "random"
     start_paused: bool = False
 
     @model_validator(mode="after")
@@ -230,6 +230,47 @@ class ExperimentRequest(Model):
             if set(ir.controller.params)-{"rate_kr", "rate_kp", "att_kp", "pos_kp", "pos_kd", "pos_ki"}:
                 raise ValueError("控制器包含当前动力学模型不支持的增益参数")
         return self
+
+
+class PresetSpec(Model):
+    id: str
+    title: str
+    summary: str
+    difficulty: Literal["starter", "intermediate", "advanced"]
+    estimated_sec: int = Field(gt=0)
+    request: ExperimentRequest
+
+
+class L1CheckRequest(Model):
+    drone_ir: DroneIR
+    goal: DesignGoal
+    scenario: TestScenario
+
+
+class RenameRunRequest(Model):
+    name: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=100)]
+
+
+class CachePruneRequest(Model):
+    max_entries: int = Field(default=2000, ge=0, le=2**63 - 1)
+    max_age_days: Nonnegative | None = None
+
+
+class CachePruneResult(Model):
+    deleted: int
+    remaining: int
+
+
+class HealthStatus(Model):
+    status: Literal["ok"] = "ok"
+    stage: int = 2
+    verification_level: Literal["DYNAMICS"] = "DYNAMICS"
+    version: str = "0.3.0"
+    worker_alive: bool
+    worker_status: Literal["idle", "busy"] | None
+    worker_last_heartbeat: float | None
+    active_run_id: str | None
+    active_candidate_id: str | None
 
 
 class Violation(Model):
@@ -286,10 +327,13 @@ class RunEvent(Model):
     message: str
 
 
+RunStatus = Literal["QUEUED", "RUNNING", "PAUSED", "CANCELLED", "COMPLETED"]
+
+
 class RunSummary(Model):
     id: str
     name: str
-    status: Literal["QUEUED", "RUNNING", "PAUSED", "CANCELLED", "COMPLETED"]
+    status: RunStatus
     created_at: float
     updated_at: float
     elapsed_sec: Nonnegative
