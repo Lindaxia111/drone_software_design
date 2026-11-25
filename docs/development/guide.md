@@ -31,7 +31,7 @@ npm run dev
 ./.runtime/python/python.exe scripts/generate_contracts.py
 ```
 
-脚本生成 8 份 JSON Schema、前端 `contracts.ts` 和 3 份 JSON 示例。不要直接编辑生成文件。
+脚本生成 9 份 JSON Schema、前端 `contracts.ts` 和 3 份 JSON 示例。不要直接编辑生成文件。
 
 `examples/experiment.json` 使用契约兼容默认值，是 demo/random 请求；动力学配置应显式指定 `evaluation_mode`、`optimizer` 及合理步长，也可取 `/api/defaults` 的工作台配置。
 
@@ -48,8 +48,9 @@ npm run dev
 | [test_workflow.py](../../tests/test_workflow.py) | 预算、缓存、生命周期、恢复与 API |
 | [test_core_integration.py](../../tests/test_core_integration.py) | 动力学、进化恢复、详情、暂停与兼容 |
 | [tests/core](../../tests/core/) | 物理基准、故障、随机化、哈希、构型与参数工具 |
+| [test_revisions.py](../../tests/test_revisions.py) | 衍生构型、历史不可变、编号、预算、暂停重评、归属和旧库迁移 |
 
-当前 43 项测试均由根目录命令收集，无需依赖额外工程目录。
+当前 49 项测试均由根目录命令收集，无需依赖额外工程目录。
 
 ```powershell
 Push-Location apps/web
@@ -74,6 +75,7 @@ $env:DRONE_LAB_DB = 'tmp/browser-check.sqlite3'
 $env:BASE_URL = 'http://127.0.0.1:8020'
 node tests/browser-core.cjs
 node tests/browser-smoke.cjs
+node tests/browser-workbench.cjs
 ```
 
 脚本使用本机 Chrome。Playwright 为可选验收工具，工作台运行不依赖它；新环境如需安装：
@@ -82,7 +84,7 @@ node tests/browser-smoke.cjs
 npm install --prefix apps/web --no-save --package-lock=false @playwright/test@1.49.1
 ```
 
-测试会创建实验记录，应使用独立测试数据库。截图和导出保存在 `tmp/core-screenshots/`、`tmp/screenshots/`。
+测试会创建实验记录，应使用独立测试数据库。截图和导出保存在 `tmp/core-screenshots/`、`tmp/screenshots/`、`tmp/workbench-screenshots/`。工作台测试使用软件 WebGL 验证模型、拆解、拾取、联动、草稿和重评。
 
 ## 变更检查
 

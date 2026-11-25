@@ -1,0 +1,68 @@
+import { useEffect, useState } from 'react';
+import { Minus, Plus, RotateCcw } from 'lucide-react';
+import type { Candidate, Run } from '../api';
+import { useWorkbenchStore } from './state';
+
+function Plot({ run, kind }: { run: Run | null; kind: 'convergence' | 'pareto' }) {
+  const { state, select, patch } = useWorkbenchStore();
+  const [zoom, setZoom] = useState(1), [panX, setPanX] = useState(0.5), [panY, setPanY] = useState(0.5);
+  const name = kind === 'convergence' ? '收敛图' : '权衡图';
+  const candidates = run?.candidates ?? [];
+  const points = candidates.filter(c => Number.isFinite(c.metrics.flight_time_min) && (kind === 'convergence' || Number.isFinite(c.metrics.tracking_rmse_m)));
+  const maxIteration = Math.max(1, ...candidates.map(c => c.proposal_index));
+  const xs = points.map(c => kind === 'convergence' ? c.proposal_index : c.metrics.tracking_rmse_m);
+  const xmin = kind === 'convergence' ? 0 : Math.min(0.1, ...xs) * 0.9;
+  const xmax = kind === 'convergence' ? maxIteration : Math.max(xmin + 0.02, ...xs) * 1.1;
+  const ymax = Math.max(5, ...points.map(c => c.metrics.flight_time_min)) * 1.13;
+  const spanX = (xmax - xmin) / zoom, spanY = ymax / zoom;
+  const startX = xmin + (xmax - xmin - spanX) * panX, startY = (ymax - spanY) * panY;
+  const w = kind === 'convergence' ? 680 : 410, h = 224, left = 45, right = w - 22, top = 22, bottom = 183;
+  const xValue = (c: Candidate) => kind === 'convergence' ? c.proposal_index : c.metrics.tracking_rmse_m;
+  const position = (c: Candidate) => [left + (xValue(c) - startX) / spanX * (right - left), bottom - (c.metrics.flight_time_min - startY) / spanY * (bottom - top)];
+  const selected = points.find(c => c.candidate_id === state.selected?.candidate_id);
+  const hovered = points.find(c => c.candidate_id === state.hovered);
+  const tooltip = hovered ?? selected;
+  useEffect(() => {
+    if (!selected || zoom === 1) return;
+    setPanX(Math.max(0, Math.min(1, (xValue(selected) - xmin - spanX / 2) / Math.max(xmax - xmin - spanX, 1e-9))));
+    setPanY(Math.max(0, Math.min(1, (selected.metrics.flight_time_min - spanY / 2) / Math.max(ymax - spanY, 1e-9))));
+  }, [state.selected?.candidate_id, zoom]);
+  let best = 0;
+  const line = points.filter(c => c.status === 'PASSED').map((c, i) => {
+    best = Math.max(best, c.metrics.flight_time_min);
+    const x = position(c)[0], y = bottom - (best - startY) / spanY * (bottom - top);
+    return `${i ? 'L' : 'M'}${x},${y}`;
+  }).join(' ');
+  const clip = `plot-${kind}`;
+  return <>
+    <div className="chart-tools"><span>{points.length} 个可查看数据点</span><div><button aria-label={`放大${name}`} onClick={() => setZoom(z => Math.min(8, z * 2))} disabled={zoom === 8}><Plus size={14}/></button><span>{zoom}×</span><button aria-label={`缩小${name}`} onClick={() => setZoom(z => Math.max(1, z / 2))} disabled={zoom === 1}><Minus size={14}/></button><button aria-label={`重置${name}`} onClick={() => { setZoom(1); setPanX(0.5); setPanY(0.5); }}><RotateCcw size={13}/></button></div></div>
+    <div className="chart-frame linked-chart" data-chart={kind}>
+      <svg viewBox={`0 0 ${w} ${h}`} role="group" aria-label={`${name}，数据点可点击查看参数`}>
+        <defs><clipPath id={clip}><rect x={left - 7} y={top - 7} width={right - left + 14} height={bottom - top + 14}/></clipPath></defs>
+        {[0, 1, 2, 3, 4].map(i => <g key={i}><line className="gridline" x1={left} x2={right} y1={bottom - i / 4 * (bottom - top)} y2={bottom - i / 4 * (bottom - top)}/><text x={left - 8} y={bottom - i / 4 * (bottom - top) + 4} textAnchor="end">{(startY + i / 4 * spanY).toFixed(0)}</text><text x={left + i / 4 * (right - left)} y={bottom + 19} textAnchor="middle">{kind === 'convergence' ? Math.round(startX + i / 4 * spanX + 1) : (startX + i / 4 * spanX).toFixed(3)}</text></g>)}
+        <text x={left} y={11}>续航 / min</text><text x={(left + right) / 2} y={h - 1} textAnchor="middle">{kind === 'convergence' ? '候选序号' : '跟踪误差 / m'}</text>
+        <g clipPath={`url(#${clip})`}>
+          {kind === 'convergence' && line && <path d={line} fill="none" stroke="#8675e4" strokeWidth="2" pointerEvents="none"/>}
+          {points.map(c => {
+            const [x, y] = position(c), active = state.selected?.candidate_id === c.candidate_id, hot = state.hovered === c.candidate_id;
+            const front = run?.pareto_ids.includes(c.candidate_id), failed = !['PASSED', 'L1_PASSED'].includes(c.status);
+            const color = failed ? '#cc8b68' : front ? '#7055d4' : '#9ba9c4';
+            return <g key={c.candidate_id} role="button" tabIndex={0} aria-label={`${name}候选 ${c.proposal_index + 1}，点击查看完整参数`} data-candidate-id={c.candidate_id} data-selected={active} data-hovered={hot} className="chart-point" onMouseEnter={() => patch({ hovered: c.candidate_id })} onMouseLeave={() => patch({ hovered: null })} onFocus={() => patch({ hovered: c.candidate_id })} onBlur={() => patch({ hovered: null })} onClick={() => select(c, true)} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); select(c, true); } }}>
+              <title>{`候选 ${c.proposal_index + 1} · 续航 ${c.metrics.flight_time_min.toFixed(2)} min${Number.isFinite(c.metrics.tracking_rmse_m) ? ` · 误差 ${c.metrics.tracking_rmse_m.toFixed(3)} m` : ''}\n点击查看完整参数`}</title>
+              <circle cx={x} cy={y} r="11" fill="transparent"/>
+              {(active || hot) && <circle cx={x} cy={y} r={active ? 9 : 8} fill="none" stroke={active ? '#5c42c9' : '#b0a2e9'} strokeWidth={active ? 2 : 1.5}/>}
+              {c.source === 'manual_revision' ? <path d={`M${x},${y - 6}l6,6 -6,6 -6,-6Z`} fill="#169b93" stroke="white" strokeWidth="1.2"/> : <circle cx={x} cy={y} r={active ? 5 : front ? 4.5 : 3.5} fill={failed ? 'white' : color} stroke={color} strokeWidth="1.5"/>}
+            </g>;
+          })}
+        </g>
+      </svg>
+      {!points.length && <div className="chart-empty">{kind === 'convergence' ? '评估后显示可点选的候选方案' : '等待完整的多目标指标'}</div>}
+      {tooltip && <div className="chart-selection-note"><strong>{state.hovered ? '预览' : '选中'}候选 {tooltip.proposal_index + 1}</strong><span>{tooltip.metrics.flight_time_min.toFixed(2)} min{Number.isFinite(tooltip.metrics.tracking_rmse_m) ? ` · ${tooltip.metrics.tracking_rmse_m.toFixed(3)} m` : ' · 尚无跟踪误差'}</span><small>点击数据点查看完整参数</small></div>}
+    </div>
+    {zoom > 1 && <div className="chart-pan"><label>水平位置<input aria-label={`${name}水平位置`} type="range" min="0" max="1" step="0.01" value={panX} onChange={e => setPanX(+e.target.value)}/></label><label>垂直位置<input aria-label={`${name}垂直位置`} type="range" min="0" max="1" step="0.01" value={panY} onChange={e => setPanY(+e.target.value)}/></label></div>}
+    <div className="chart-legend"><span><i className="legend-front"/>帕累托</span><span><i className="legend-normal"/>普通候选</span><span><i className="legend-failed"/>淘汰</span><span>◆ 手动修订</span></div>
+    {kind === 'pareto' && candidates.length > points.length && <p className="chart-missing">{candidates.length - points.length} 个候选尚无完整指标，可在收敛图或列表中查参。</p>}
+  </>;
+}
+export function Convergence({ run }: { run: Run | null }) { return <Plot run={run} kind="convergence"/>; }
+export function Pareto({ run }: { run: Run | null }) { return <Plot run={run} kind="pareto"/>; }

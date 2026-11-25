@@ -204,6 +204,27 @@
           },
           "title": "Violations",
           "type": "array"
+        },
+        "source": {
+          "default": "optimizer",
+          "enum": [
+            "optimizer",
+            "manual_revision"
+          ],
+          "title": "Source",
+          "type": "string"
+        },
+        "parent_ir_hash": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Parent Ir Hash"
         }
       },
       "required": [
@@ -215,7 +236,9 @@
         "ir",
         "status",
         "metrics",
-        "violations"
+        "violations",
+        "source",
+        "parent_ir_hash"
       ],
       "title": "CandidateRecord",
       "type": "object"

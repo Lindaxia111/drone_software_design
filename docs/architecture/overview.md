@@ -1,6 +1,6 @@
 # 工程架构
 
-本页描述 v0.2.0 的当前实现；待开发功能集中在 [开发路线](../development/roadmap.md)。
+本页描述 v0.3.0 的当前实现；待开发功能集中在 [开发路线](../development/roadmap.md)。
 
 ## 目标与范围
 
@@ -49,6 +49,7 @@ flowchart TD
 | EvalResult / EvaluationRecord | 单层指标、版本、产物和缓存信息 |
 | AttemptRecord | 实际派发的状态、时间与诊断 |
 | CandidateDetails | 参数、请求、评估和尝试的查询视图 |
+| RevisionRequest | 父方案哈希和修订构型 |
 
 应用契约以 Pydantic 为准，生成 [JSON Schema](../../schemas/) 与 [TypeScript 类型](../../apps/web/src/contracts.ts)。核心内部契约由适配层转换，HTTP 接口采用应用契约。
 
@@ -78,11 +79,17 @@ Worker 在短事务中选择实验、推进候选序号、预占预算并记录�
 
 随机搜索由种子、序号和实现版本决定提案。进化搜索按已完成代的持久化结果重建策略，当前代提案在内存中加速，批次按 run_id 隔离。
 
+手动修订追加候选，保存 `source=manual_revision` 和 `parent_ir_hash`。候选显示序号统一分配，算法提案序号单独保持，不让手动记录进入进化种群反馈。显式提交的修订可在原实验暂停或完成后执行，保持其生命周期不变，沿用原场景和剩余执行预算；取消会停止尚未完成的手动任务。数据库以增加列方式兼容既有候选。
+
+前端 `workbench/state.tsx` 统一管理选中、悬停、抽屉、视角和独立草稿。Three.js 懒加载，模型按 DroneIR 更新，FRD 映射为显示坐标 `[Y,-Z,-X]`，拆解只改变显示位置。卸载时释放渲染器、控制器和 GPU 资源；不可用时回退到参数操作界面。
+
 ## 缓存、预算与存储
 
 应用缓存键包含应用 DroneIR 哈希、Schema 版本、完整场景、层级、评估器版本和随机种子。哈希排除实验名称等运行信息；应用层不额外归一化旋翼排列等物理等价关系。
 
 缓存保存用户约束应用前的原始物理结果，命中后按当前目标重筛。CRASHED/TIMEOUT 不入缓存。评估行为或产物变化应升级评估器版本。
+
+目标适应度评分在缓存之外按当前目标计算；尚缺少目标指标的通过层级不生成完整评分。手动修订与算法候选复用相同缓存和预算规则。
 
 预算按实际派发计数，缓存命中免费，中断尝试仍计入。时限按 RUNNING 墙钟时间累计，暂停不计时，Worker 离线期间仍计时。动力学单次截止取实验剩余时限和 30 秒的较小值。
 
@@ -107,7 +114,7 @@ SQLite 保存实验、候选、评估、尝试、缓存及事件；回放帧随�
 - 功耗、推力、阻力和电池采用探索级简化模型，无地面效应和桨间气动干扰。
 - 随机化当前扰动机身质量和惯量，不等价于完整整机参数随机化。
 - 支持容量、单桨推力、机身质量、臂长、桨半径、电机时间常数六个连续搜索参数。容量按固定 180 Wh/kg 联动电池质量。
-- 当前提供 JSON 报告、俯视构型图和轨迹时间查看，未接入 PDF 报告、Parquet 或 3D 场景回放。
+- 当前提供 JSON 报告、3D 构型拆解/编辑和名义轨迹时间查看，未接入 PDF 报告、Parquet 或三维飞行场景回放。
 - 当前没有 L3、Optuna/PyMOO、PostgreSQL/对象存储、分布式队列、账号或多租户系统。
 
 ## API 入口
@@ -120,6 +127,7 @@ SQLite 保存实验、候选、评估、尝试、缓存及事件；回放帧随�
 | `GET /api/experiments/{run_id}` | 实验详情 |
 | `POST /api/experiments/{run_id}/{action}` | pause、resume、cancel、retry |
 | `GET /api/experiments/{run_id}/candidates/{candidate_id}` | 候选参数与评估记录 |
+| `POST /api/experiments/{run_id}/candidates/evaluate` | 提交衍生构型，返回 202，由 Worker 评估 |
 | `GET /api/experiments/{run_id}/candidates/{candidate_id}/ir` | 导出构型 |
 | `GET /api/experiments/{run_id}/report` | 导出报告 |
 

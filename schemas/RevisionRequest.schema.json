@@ -1,0 +1,349 @@
+{
+  "$defs": {
+    "Airframe": {
+      "additionalProperties": false,
+      "properties": {
+        "topology": {
+          "const": "multirotor",
+          "default": "multirotor",
+          "title": "Topology",
+          "type": "string"
+        },
+        "base_mass_kg": {
+          "default": 0.55,
+          "exclusiveMinimum": 0,
+          "title": "Base Mass Kg",
+          "type": "number"
+        },
+        "inertia_diag_kg_m2": {
+          "default": [
+            0.02,
+            0.02,
+            0.04
+          ],
+          "maxItems": 3,
+          "minItems": 3,
+          "prefixItems": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "number"
+            },
+            {
+              "exclusiveMinimum": 0,
+              "type": "number"
+            },
+            {
+              "exclusiveMinimum": 0,
+              "type": "number"
+            }
+          ],
+          "title": "Inertia Diag Kg M2",
+          "type": "array"
+        },
+        "cg_offset_m": {
+          "default": [
+            0,
+            0,
+            0
+          ],
+          "maxItems": 3,
+          "minItems": 3,
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ],
+          "title": "Cg Offset M",
+          "type": "array"
+        },
+        "linear_drag_coeff": {
+          "default": [
+            0.1,
+            0.1,
+            0.15
+          ],
+          "maxItems": 3,
+          "minItems": 3,
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ],
+          "title": "Linear Drag Coeff",
+          "type": "array"
+        }
+      },
+      "required": [
+        "topology",
+        "base_mass_kg",
+        "inertia_diag_kg_m2",
+        "cg_offset_m",
+        "linear_drag_coeff"
+      ],
+      "title": "Airframe",
+      "type": "object"
+    },
+    "Controller": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "cascaded_pid",
+          "default": "cascaded_pid",
+          "title": "Type",
+          "type": "string"
+        },
+        "auto_scale_gains": {
+          "default": true,
+          "title": "Auto Scale Gains",
+          "type": "boolean"
+        },
+        "params": {
+          "additionalProperties": {
+            "type": "number"
+          },
+          "title": "Params",
+          "type": "object"
+        }
+      },
+      "required": [
+        "type",
+        "auto_scale_gains",
+        "params"
+      ],
+      "title": "Controller",
+      "type": "object"
+    },
+    "DroneIR": {
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "const": "1.0.0",
+          "default": "1.0.0",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "airframe": {
+          "$ref": "#/$defs/Airframe"
+        },
+        "rotors": {
+          "items": {
+            "$ref": "#/$defs/Rotor"
+          },
+          "maxItems": 8,
+          "minItems": 4,
+          "title": "Rotors",
+          "type": "array"
+        },
+        "power": {
+          "$ref": "#/$defs/Power"
+        },
+        "payload": {
+          "$ref": "#/$defs/Payload"
+        },
+        "controller": {
+          "$ref": "#/$defs/Controller"
+        }
+      },
+      "required": [
+        "schema_version",
+        "airframe",
+        "rotors",
+        "power",
+        "payload",
+        "controller"
+      ],
+      "title": "DroneIR",
+      "type": "object"
+    },
+    "Payload": {
+      "additionalProperties": false,
+      "properties": {
+        "mass_kg": {
+          "default": 0.2,
+          "minimum": 0,
+          "title": "Mass Kg",
+          "type": "number"
+        },
+        "position_m": {
+          "default": [
+            0,
+            0,
+            0
+          ],
+          "maxItems": 3,
+          "minItems": 3,
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ],
+          "title": "Position M",
+          "type": "array"
+        }
+      },
+      "required": [
+        "mass_kg",
+        "position_m"
+      ],
+      "title": "Payload",
+      "type": "object"
+    },
+    "Power": {
+      "additionalProperties": false,
+      "properties": {
+        "battery_mass_kg": {
+          "default": 0.4,
+          "exclusiveMinimum": 0,
+          "title": "Battery Mass Kg",
+          "type": "number"
+        },
+        "capacity_wh": {
+          "default": 72,
+          "exclusiveMinimum": 0,
+          "title": "Capacity Wh",
+          "type": "number"
+        },
+        "max_discharge_w": {
+          "default": 800,
+          "exclusiveMinimum": 0,
+          "title": "Max Discharge W",
+          "type": "number"
+        }
+      },
+      "required": [
+        "battery_mass_kg",
+        "capacity_wh",
+        "max_discharge_w"
+      ],
+      "title": "Power",
+      "type": "object"
+    },
+    "Rotor": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "position_m": {
+          "maxItems": 3,
+          "minItems": 3,
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ],
+          "title": "Position M",
+          "type": "array"
+        },
+        "thrust_axis": {
+          "default": [
+            0,
+            0,
+            -1
+          ],
+          "maxItems": 3,
+          "minItems": 3,
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ],
+          "title": "Thrust Axis",
+          "type": "array"
+        },
+        "spin_direction": {
+          "enum": [
+            -1,
+            1
+          ],
+          "title": "Spin Direction",
+          "type": "integer"
+        },
+        "max_thrust_n": {
+          "default": 8.0,
+          "exclusiveMinimum": 0,
+          "title": "Max Thrust N",
+          "type": "number"
+        },
+        "torque_to_thrust_ratio": {
+          "default": 0.02,
+          "exclusiveMinimum": 0,
+          "title": "Torque To Thrust Ratio",
+          "type": "number"
+        },
+        "motor_time_constant_s": {
+          "default": 0.03,
+          "exclusiveMinimum": 0,
+          "title": "Motor Time Constant S",
+          "type": "number"
+        },
+        "prop_radius_m": {
+          "default": 0.1,
+          "exclusiveMinimum": 0,
+          "title": "Prop Radius M",
+          "type": "number"
+        }
+      },
+      "required": [
+        "id",
+        "position_m",
+        "thrust_axis",
+        "spin_direction",
+        "max_thrust_n",
+        "torque_to_thrust_ratio",
+        "motor_time_constant_s",
+        "prop_radius_m"
+      ],
+      "title": "Rotor",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "parent_ir_hash": {
+      "pattern": "^[a-f0-9]{64}$",
+      "title": "Parent Ir Hash",
+      "type": "string"
+    },
+    "drone_ir": {
+      "$ref": "#/$defs/DroneIR"
+    }
+  },
+  "required": [
+    "parent_ir_hash",
+    "drone_ir"
+  ],
+  "title": "RevisionRequest",
+  "type": "object"
+}

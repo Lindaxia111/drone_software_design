@@ -5,13 +5,13 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from .domain import CandidateDetails, ExperimentRequest, ExperimentRun, RunSummary, TestScenario, baseline_ir
+from .domain import CandidateDetails, CandidateRecord, ExperimentRequest, ExperimentRun, RevisionRequest, RunSummary, TestScenario, baseline_ir
 from .storage import Store
 
 
 def create_app(db_path=None):
     store = Store(db_path or os.getenv("DRONE_LAB_DB", "data/drone_lab.sqlite3"))
-    app = FastAPI(title="翼构 · 无人机设计实验室", version="0.2.0")
+    app = FastAPI(title="翼构 · 无人机设计实验室", version="0.3.0")
     app.state.store = store
 
     @app.exception_handler(KeyError)
@@ -20,7 +20,7 @@ def create_app(db_path=None):
 
     @app.get("/api/health")
     def health():
-        return {"status": "ok", "stage": 2, "verification_level": "DYNAMICS", "version": "0.2.0"}
+        return {"status": "ok", "stage": 2, "verification_level": "DYNAMICS", "version": "0.3.0"}
 
     @app.get("/api/defaults")
     def defaults():
@@ -68,6 +68,13 @@ def create_app(db_path=None):
     @app.get("/api/experiments/{run_id}/candidates/{candidate_id}", response_model=CandidateDetails)
     def candidate_details(run_id: str, candidate_id: str):
         return store.candidate_details(run_id, candidate_id)
+
+    @app.post("/api/experiments/{run_id}/candidates/evaluate", response_model=CandidateRecord, status_code=202)
+    def evaluate_revision(run_id: str, revision: RevisionRequest):
+        try:
+            return store.enqueue_revision(run_id, revision)
+        except ValueError as exc:
+            raise HTTPException(409, str(exc)) from exc
 
     web = Path(__file__).resolve().parents[2] / "web" / "dist"
     if web.exists():

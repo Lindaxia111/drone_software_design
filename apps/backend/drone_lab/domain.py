@@ -256,6 +256,7 @@ class EvalResult(Model):
     message: str = ""
     replay: ReplayData | None = None
     resolved_parameters: dict[str, float] = Field(default_factory=dict)
+    fitness_score: float | None = None
 
 
 class CandidateRecord(Model):
@@ -268,6 +269,13 @@ class CandidateRecord(Model):
     status: Literal["NEW", "L1_PASSED", "PASSED", "REJECTED_CONSTRAINT", "CRASHED", "TIMEOUT", "UNSUPPORTED", "SKIPPED"]
     metrics: dict[str, float]
     violations: list[Violation]
+    source: Literal["optimizer", "manual_revision"] = "optimizer"
+    parent_ir_hash: str | None = None
+
+
+class RevisionRequest(Model):
+    parent_ir_hash: str = Field(pattern=r"^[a-f0-9]{64}$")
+    drone_ir: DroneIR
 
 
 class RunEvent(Model):

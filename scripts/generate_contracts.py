@@ -5,7 +5,7 @@ import sys
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "apps/backend"))
-from drone_lab.domain import CandidateDetails, DesignGoal, DroneIR, EvalResult, ExperimentRequest, ExperimentRun, RunSummary, TestScenario, baseline_ir  # noqa: E402
+from drone_lab.domain import CandidateDetails, DesignGoal, DroneIR, EvalResult, ExperimentRequest, ExperimentRun, RevisionRequest, RunSummary, TestScenario, baseline_ir  # noqa: E402
 
 
 def ts_type(schema):
@@ -43,7 +43,7 @@ def main():
     definitions = {}
     folder = ROOT/"schemas"
     folder.mkdir(exist_ok=True)
-    models = (DesignGoal, DroneIR, TestScenario, EvalResult, ExperimentRequest, ExperimentRun, RunSummary, CandidateDetails)
+    models = (DesignGoal, DroneIR, TestScenario, EvalResult, ExperimentRequest, ExperimentRun, RunSummary, CandidateDetails, RevisionRequest)
     for model in models:
         schema = model.model_json_schema(mode="serialization")
         (folder/f"{model.__name__}.schema.json").write_text(json.dumps(schema, indent=2, ensure_ascii=False)+"\n", encoding="utf-8")

@@ -25,14 +25,18 @@ class Engine:
                 self.store.event(db, row["run_id"], "RECOVERED", "发现中断任务，将按剩余预算重新执行")
 
     def complete(self, db, run_id, reason):
-        db.execute("UPDATE candidates SET status='SKIPPED' WHERE run_id=? AND status IN ('NEW','L1_PASSED')", (run_id,))
+        db.execute("UPDATE candidates SET status='SKIPPED' WHERE run_id=? AND source='optimizer' AND status IN ('NEW','L1_PASSED')", (run_id,))
         self.store.set_status(db, run_id, "COMPLETED", reason)
         self.store.event(db, run_id, "COMPLETED", f"实验完成：{reason}")
 
     def tick(self) -> bool:
         # Reservation, candidate cursor and budget increment share one transaction.
         with self.store.transaction() as db:
-            run = db.execute("SELECT * FROM runs WHERE status IN ('RUNNING','QUEUED') ORDER BY updated_at,created_at LIMIT 1").fetchone()
+            # Explicit revision tasks also run for paused/completed experiments;
+            # their lifecycle stays unchanged and their optimizer is not resumed.
+            candidate = db.execute("SELECT c.* FROM candidates c JOIN runs r ON r.id=c.run_id WHERE c.source='manual_revision' AND c.status IN ('NEW','L1_PASSED') AND r.status!='CANCELLED' ORDER BY c.rowid LIMIT 1").fetchone()
+            manual = candidate is not None
+            run = db.execute("SELECT * FROM runs WHERE id=?", (candidate["run_id"],)).fetchone() if manual else db.execute("SELECT * FROM runs WHERE status IN ('RUNNING','QUEUED') ORDER BY updated_at,created_at LIMIT 1").fetchone()
             if not run:
                 return False
             run_id = run["id"]
@@ -43,17 +47,18 @@ class Engine:
                 evaluators = {"L1": CoreL1Evaluator(), "L2": DynamicsEvaluator()}
             else:
                 evaluators = self.evaluators
-            if run["status"] == "QUEUED":
+            if run["status"] == "QUEUED" and not manual:
                 self.store.set_status(db, run_id, "RUNNING")
                 self.store.event(db, run_id, "RUNNING", "计算 Worker 已接管实验")
                 run = db.execute("SELECT * FROM runs WHERE id=?", (run_id,)).fetchone()
-            elapsed = run["elapsed_sec"] + time.time()-run["resumed_at"]
-            if elapsed >= budget.timeout_sec:
+            elapsed = 0 if manual else run["elapsed_sec"] + time.time()-run["resumed_at"]
+            if elapsed >= budget.timeout_sec and not manual:
                 self.complete(db, run_id, "TIME_BUDGET")
                 return True
             if request.evaluation_mode == "dynamics":
                 evaluators["L2"].timeout_s = max(0.001, min(30, budget.timeout_sec-elapsed))
-            candidate = db.execute("SELECT * FROM candidates WHERE run_id=? AND status IN ('NEW','L1_PASSED') ORDER BY proposal_index LIMIT 1", (run_id,)).fetchone()
+            if not manual:
+                candidate = db.execute("SELECT * FROM candidates WHERE run_id=? AND source='optimizer' AND status IN ('NEW','L1_PASSED') ORDER BY proposal_index LIMIT 1", (run_id,)).fetchone()
             if not candidate:
                 index = run["next_index"]
                 if index >= budget.max_generations*budget.batch_size:
@@ -61,15 +66,16 @@ class Engine:
                     return True
                 if request.optimizer == "evolution":
                     history = []
-                    for c in db.execute("SELECT * FROM candidates WHERE run_id=? ORDER BY proposal_index", (run_id,)):
+                    for ordinal, c in enumerate(db.execute("SELECT * FROM candidates WHERE run_id=? AND source='optimizer' ORDER BY proposal_index", (run_id,))):
                         import json
-                        history.append({**dict(c), "metrics": json.loads(c["metrics"]), "violations": json.loads(c["violations"])})
+                        history.append({**dict(c), "proposal_index": ordinal, "metrics": json.loads(c["metrics"]), "violations": json.loads(c["violations"])})
                     ir = self.evolution.suggest(request, index, history, run_id)
                 else:
                     ir = self.optimizer.suggest(request, index)
                 candidate_id = uid()
+                proposal_index = db.execute("SELECT COALESCE(MAX(proposal_index),-1)+1 FROM candidates WHERE run_id=?", (run_id,)).fetchone()[0]
                 db.execute("INSERT INTO candidates(id,run_id,proposal_index,generation,ir_hash,ir,status) VALUES(?,?,?,?,?,?,?)",
-                    (candidate_id, run_id, index, index//budget.batch_size+1, ir.ir_hash, ir.model_dump_json(), "NEW"))
+                    (candidate_id, run_id, proposal_index, index//budget.batch_size+1, ir.ir_hash, ir.model_dump_json(), "NEW"))
                 db.execute("UPDATE runs SET next_index=next_index+1 WHERE id=?", (run_id,))
                 candidate = db.execute("SELECT * FROM candidates WHERE id=?", (candidate_id,)).fetchone()
             ir = DroneIR.model_validate_json(candidate["ir"])
@@ -83,7 +89,11 @@ class Engine:
             column = "l1_used" if level == "L1" else "l2_used"
             limit = budget.max_l1_evals if level == "L1" else budget.max_l2_evals
             if run[column] >= limit:
-                self.complete(db, run_id, f"{level}_BUDGET")
+                if manual:
+                    db.execute("UPDATE candidates SET status='SKIPPED' WHERE id=?", (candidate["id"],))
+                    self.store.event(db, run_id, "REVISION_SKIPPED", f"手动修订候选 {candidate['proposal_index']+1}：{level} 预算耗尽，可另建实验")
+                else:
+                    self.complete(db, run_id, f"{level}_BUDGET")
                 return True
             attempt_id = uid()
             db.execute("UPDATE runs SET " + column + "=" + column + "+1,updated_at=? WHERE id=?", (time.time(), run_id))
@@ -115,6 +125,9 @@ class Engine:
             if result.violations:
                 result.status = "REJECTED_CONSTRAINT"
         candidate_status = "L1_PASSED" if level == "L1" and result.status == "PASSED" else result.status
+        if result.status != "PASSED" or all(o.metric in result.metrics for o in request.goal.objectives):
+            result.fitness_score = EvolutionOptimizer.score({"status": result.status, "metrics": result.metrics,
+                "violations": [v.model_dump() for v in result.violations]}, request)
         db.execute("INSERT INTO evaluations(id,candidate_id,level,cache_key,result,cache_hit) VALUES(?,?,?,?,?,?)",
                    (uid(), candidate["id"], level, key, result.model_dump_json(), int(cached)))
         db.execute("UPDATE candidates SET status=?,metrics=?,violations=? WHERE id=?",

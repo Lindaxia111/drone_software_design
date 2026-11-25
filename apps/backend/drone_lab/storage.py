@@ -6,7 +6,7 @@ import time
 import uuid
 from pathlib import Path
 
-from .domain import ExperimentRequest
+from .domain import ExperimentRequest, RevisionRequest
 from .evaluators import pareto_indices
 
 
@@ -36,6 +36,7 @@ class Store:
                     proposal_index INTEGER NOT NULL, generation INTEGER NOT NULL,
                     ir_hash TEXT NOT NULL, ir TEXT NOT NULL, status TEXT NOT NULL,
                     metrics TEXT NOT NULL DEFAULT '{}', violations TEXT NOT NULL DEFAULT '[]',
+                    source TEXT NOT NULL DEFAULT 'optimizer', parent_ir_hash TEXT,
                     UNIQUE(run_id, proposal_index));
                 CREATE TABLE IF NOT EXISTS evaluations (
                     id TEXT PRIMARY KEY, candidate_id TEXT NOT NULL REFERENCES candidates(id),
@@ -52,6 +53,12 @@ class Store:
                 CREATE INDEX IF NOT EXISTS idx_candidates_run ON candidates(run_id, proposal_index);
                 CREATE INDEX IF NOT EXISTS idx_events_run ON events(run_id, seq);
             """)
+            db.execute("BEGIN IMMEDIATE")
+            columns = {row[1] for row in db.execute("PRAGMA table_info(candidates)")}
+            if "source" not in columns:
+                db.execute("ALTER TABLE candidates ADD COLUMN source TEXT NOT NULL DEFAULT 'optimizer'")
+            if "parent_ir_hash" not in columns:
+                db.execute("ALTER TABLE candidates ADD COLUMN parent_ir_hash TEXT")
 
     @contextmanager
     def transaction(self):
@@ -102,6 +109,8 @@ class Store:
             if row["status"] not in allowed:
                 raise ValueError(f"当前状态 {row['status']} 不允许 {action}")
             self.set_status(db, run_id, target, "USER_CANCELLED" if action == "cancel" else None)
+            if action == "cancel":
+                db.execute("UPDATE candidates SET status='SKIPPED' WHERE run_id=? AND source='manual_revision' AND status IN ('NEW','L1_PASSED')", (run_id,))
             self.event(db, run_id, target, {"pause": "实验已暂停；已派发任务可完成归档", "resume": "实验已进入恢复队列", "cancel": "实验已取消"}[action])
         return self.detail(run_id)
 
@@ -176,3 +185,29 @@ class Store:
         request.start_paused = False
         request.goal.name = request.goal.name[:95] + " · 复测"
         return self.create(request)
+
+    def enqueue_revision(self, run_id: str, revision: RevisionRequest):
+        from pydantic import ValidationError
+        with self.transaction() as db:
+            run = db.execute("SELECT * FROM runs WHERE id=?", (run_id,)).fetchone()
+            if not run:
+                raise KeyError(run_id)
+            if run["status"] == "CANCELLED":
+                raise ValueError("已取消的实验不能追加评估，请以此构型新建实验")
+            parent = db.execute("SELECT id FROM candidates WHERE run_id=? AND ir_hash=?", (run_id, revision.parent_ir_hash)).fetchone()
+            if not parent:
+                raise KeyError(revision.parent_ir_hash)
+            # Validate this concrete plane against the original scenario, not search bounds.
+            data = json.loads(run["request"])
+            data["seed_ir"] = revision.drone_ir.model_dump(mode="json")
+            data["goal"]["search_space"] = []
+            try:
+                ExperimentRequest.model_validate(data)
+            except ValidationError as exc:
+                raise ValueError("修订与当前场景不兼容：" + "; ".join(e["msg"] for e in exc.errors())) from exc
+            index = db.execute("SELECT COALESCE(MAX(proposal_index),-1)+1 FROM candidates WHERE run_id=?", (run_id,)).fetchone()[0]
+            candidate_id = uid()
+            db.execute("INSERT INTO candidates(id,run_id,proposal_index,generation,ir_hash,ir,status,source,parent_ir_hash) VALUES(?,?,?,?,?,?,?,?,?)",
+                       (candidate_id, run_id, index, 0, revision.drone_ir.ir_hash, revision.drone_ir.model_dump_json(), "NEW", "manual_revision", revision.parent_ir_hash))
+            self.event(db, run_id, "REVISION_QUEUED", f"手动修订候选 {index+1} 已入队；复用实验评估预算，原构型保持不变")
+        return self.candidate_details(run_id, candidate_id)["candidate"]

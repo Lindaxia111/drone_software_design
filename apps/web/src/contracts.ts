@@ -45,6 +45,8 @@ export type CandidateRecord = {
   "status": "NEW" | "L1_PASSED" | "PASSED" | "REJECTED_CONSTRAINT" | "CRASHED" | "TIMEOUT" | "UNSUPPORTED" | "SKIPPED";
   "metrics": Record<string, number>;
   "violations": Array<Violation>;
+  "source": "optimizer" | "manual_revision";
+  "parent_ir_hash": string | null;
 };
 
 export type Constraint = {
@@ -93,6 +95,7 @@ export type EvalResult = {
   "message": string;
   "replay": ReplayData | null;
   "resolved_parameters": Record<string, number>;
+  "fitness_score": number | null;
 };
 
 export type EvaluationRecord = {
@@ -172,6 +175,11 @@ export type ReplayData = {
   "coordinate_frame": "NED";
   "quaternion_order": "wxyz";
   "frames": Array<[number, number, number, number, number, number, number, number]>;
+};
+
+export type RevisionRequest = {
+  "parent_ir_hash": string;
+  "drone_ir": DroneIR;
 };
 
 export type Rotor = {

@@ -167,6 +167,18 @@
       },
       "title": "Resolved Parameters",
       "type": "object"
+    },
+    "fitness_score": {
+      "anyOf": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Fitness Score"
     }
   },
   "required": [
@@ -179,7 +191,8 @@
     "fidelity",
     "message",
     "replay",
-    "resolved_parameters"
+    "resolved_parameters",
+    "fitness_score"
   ],
   "title": "EvalResult",
   "type": "object"
